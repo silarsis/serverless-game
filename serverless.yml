@@ -105,16 +105,20 @@ resources:
       Properties:
         SubnetId:
           Ref: PrivateSubnet3
-      RouteTableId:
-        Ref: PrivateRouteTable
+        RouteTableId:
+          Ref: PrivateRouteTable
     # Location resources
     LocTopic:
       Type: AWS::SNS::Topic
       Properties:
+        VpcId:
+          Ref: Vpc
         TopicName: LocTopic
     LocDynamoDBTable:
       Type: 'AWS::DynamoDB::Table'
       Properties:
+        VpcId:
+          Ref: Vpc
         AttributeDefinitions:
           -
             AttributeName: locId
