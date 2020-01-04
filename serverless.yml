@@ -25,7 +25,10 @@ provider:
 
 functions:
   loc:
-    handler: loc.handler.hello
+    handler: loc/handler.hello
+    package:
+      include:
+        - loc/**
     events:
       - sns:
           arn: !Ref LocTopic
