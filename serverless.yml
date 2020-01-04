@@ -26,6 +26,8 @@ provider:
 functions:
   loc:
     handler: loc/handler.hello
+    VpcId:
+      Ref: Vpc
     package:
       include:
         - loc/**
