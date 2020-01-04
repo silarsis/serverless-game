@@ -118,7 +118,7 @@ resources:
             - 'com.amazonaws'
             - Ref: 'AWS::Region'
             - 'dynamodb'
-        VpcId: !Ref VPC
+        VpcId: !Ref Vpc
     # Location resources
     LocTopic:
       Type: AWS::SNS::Topic
