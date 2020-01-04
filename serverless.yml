@@ -113,7 +113,7 @@ resources:
         RouteTableIds:
           - !Ref PrivateRouteTable
         ServiceName:
-          - 'Fn::Join':
+          'Fn::Join':
             - '.'
             -
               - 'com.amazonaws'
@@ -126,7 +126,7 @@ resources:
         RouteTableIds:
           - !Ref PrivateRouteTable
         ServiceName:
-          - 'Fn::Join':
+          'Fn::Join':
             - '.'
             -
               - 'com.amazonaws'
