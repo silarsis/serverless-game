@@ -1,0 +1,54 @@
+service: serverless-game
+# app and org for use with dashboard.serverless.com
+app: serverless-game
+org: silarsis
+
+custom:
+  tableName: 'loc-table-${self:provider.stage}'
+
+provider:
+  name: aws
+  runtime: python3.8
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - dynamodb:Query
+        - dynamodb:Scan
+        - dynamodb:GetItem
+        - dynamodb:PutItem
+        - dynamodb:UpdateItem
+        - dynamodb:DeleteItem
+      Resource:
+        - { "Fn::GetAtt": ["UsersDynamoDBTable", "Arn" ] }
+  environment:
+    LOC_TABLE: ${self:custom.tableName}
+
+functions:
+  loc:
+    handler: loc.handler.hello
+    events:
+      - sns:
+          arn: !Ref LocTopic
+          topicName: LocTopic
+
+resources:
+  Resources:
+    LocTopic:
+      Type: AWS::SNS::Topic
+      Properties:
+        TopicName: LocTopic
+    LocDynamoDBTable:
+      Type: 'AWS::DynamoDB::Table'
+      Properties:
+        AttributeDefinitions:
+          -
+            AttributeName: locId
+            AttributeType: S
+        KeySchema:
+          -
+            AttributeName: locId
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        TableName: ${self:custom.tableName}
