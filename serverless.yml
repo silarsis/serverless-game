@@ -113,7 +113,11 @@ resources:
         RouteTableIds:
           - !Ref PrivateRouteTable
         ServiceName:
-          !Sub "com.amazonaws.ap-southeast-1.dynamodb"
+          - 'Fn::Join':
+            - '.'
+            - 'com.amazonaws'
+            - Ref: 'AWS::Region'
+            - 'dynamodb'
         VpcId: !Ref VPC
     # Location resources
     LocTopic:
