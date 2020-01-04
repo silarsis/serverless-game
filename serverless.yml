@@ -63,10 +63,7 @@ resources:
         AvailabilityZone: ap-southeast-1c
         CidrBlock: 10.0.3.0/24
         VpcId:
-          Ref: VpcEip:
-      Type: AWS::EC2::EIP
-      Properties:
-        Domain: vpc
+          Ref: Vpc
     InternetGateway:
       Type: AWS::EC2::InternetGateway
     VPCGatewayAttachment:
