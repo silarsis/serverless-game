@@ -115,9 +115,10 @@ resources:
         ServiceName:
           - 'Fn::Join':
             - '.'
-            - 'com.amazonaws'
-            - Ref: 'AWS::Region'
-            - 'dynamodb'
+            -
+              - 'com.amazonaws'
+              - Ref: 'AWS::Region'
+              - 'dynamodb'
         VpcId: !Ref Vpc
     # Location resources
     LocTopic:
