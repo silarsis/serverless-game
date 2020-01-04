@@ -107,6 +107,14 @@ resources:
           Ref: PrivateSubnet3
         RouteTableId:
           Ref: PrivateRouteTable
+    DynamoDBEndpoint:
+      Type: "AWS::EC2::VPCEndpoint"
+      Properties:
+        RouteTableIds:
+          - !Ref PrivateRouteTable
+        ServiceName:
+          !Sub "com.amazonaws.${AWS::Region}.dynamodb"
+        VpcId: !Ref VPC
     # Location resources
     LocTopic:
       Type: AWS::SNS::Topic
@@ -117,8 +125,6 @@ resources:
     LocDynamoDBTable:
       Type: 'AWS::DynamoDB::Table'
       Properties:
-        VpcId:
-          Ref: Vpc
         AttributeDefinitions:
           -
             AttributeName: locId
