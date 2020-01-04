@@ -19,7 +19,7 @@ provider:
         - dynamodb:UpdateItem
         - dynamodb:DeleteItem
       Resource:
-        - { "Fn::GetAtt": ["UsersDynamoDBTable", "Arn" ] }
+        - { "Fn::GetAtt": ["LocDynamoDBTable", "Arn" ] }
   environment:
     LOC_TABLE: ${self:custom.tableName}
 
