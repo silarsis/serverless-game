@@ -120,12 +120,22 @@ resources:
               - Ref: 'AWS::Region'
               - 'dynamodb'
         VpcId: !Ref Vpc
+    SNSEndpoint:
+      Type: "AWS::EC2::VPCEndpoint"
+      Properties:
+        RouteTableIds:
+          - !Ref PrivateRouteTable
+        ServiceName:
+          - 'Fn::Join':
+            - '.'
+            -
+              - 'com.amazonaws'
+              - Ref: 'AWS::Region'
+              - 'sns'
     # Location resources
     LocTopic:
       Type: AWS::SNS::Topic
       Properties:
-        VpcId:
-          Ref: Vpc
         TopicName: LocTopic
     LocDynamoDBTable:
       Type: 'AWS::DynamoDB::Table'
