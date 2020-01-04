@@ -123,6 +123,7 @@ resources:
     SNSEndpoint:
       Type: "AWS::EC2::VPCEndpoint"
       Properties:
+        VpcEndpointType: Interface
         RouteTableIds:
           - !Ref PrivateRouteTable
         ServiceName:
