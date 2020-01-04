@@ -132,6 +132,7 @@ resources:
               - 'com.amazonaws'
               - Ref: 'AWS::Region'
               - 'sns'
+        VpcId: !Ref Vpc
     # Location resources
     LocTopic:
       Type: AWS::SNS::Topic
