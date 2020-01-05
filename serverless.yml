@@ -176,4 +176,4 @@ resources:
     VpcId:
       Value: !Ref Vpc
       Export:
-        Name: ${self:custom.stage}-VpcId
+        Name: ${self:provider.stage}-VpcId
