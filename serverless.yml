@@ -112,6 +112,7 @@ resources:
     EndpointSecurityGroup:
       Type: AWS::EC2::SecurityGroup
       Properties:
+        GroupDescription: VPC Interface Endpoint
         VpcId: !Ref Vpc
         SecurityGroupIngress:
           -
