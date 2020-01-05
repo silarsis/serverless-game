@@ -43,6 +43,8 @@ resources:
       Type: AWS::EC2::VPC
       Properties:
         CidrBlock: 10.0.0.0/16
+        EnableDnsHostnames: true
+        EnableDnsSupport: true
     PrivateSubnet1:
       Type: AWS::EC2::Subnet
       Properties:
@@ -107,6 +109,16 @@ resources:
           Ref: PrivateSubnet3
         RouteTableId:
           Ref: PrivateRouteTable
+    EndpointSecurityGroup:
+      Type: AWS::EC2::SecurityGroup
+      Properties:
+        VpcId: !Ref Vpc
+        SecurityGroupIngress:
+          -
+            CidrIp: '10.0.0.0/8'
+            FromPort: 0
+            ToPort: 65535
+            IpProtocol: tcp
     DynamoDBEndpoint:
       Type: "AWS::EC2::VPCEndpoint"
       Properties:
@@ -124,8 +136,13 @@ resources:
       Type: "AWS::EC2::VPCEndpoint"
       Properties:
         VpcEndpointType: Interface
-        RouteTableIds:
-          - !Ref PrivateRouteTable
+        PrivateDnsEnabled: true
+        SubnetIds:
+          - Ref: PrivateSubnet1
+          - Ref: PrivateSubnet2
+          - Ref: PrivateSubnet3
+        SecurityGroupIds:
+          - Ref: EndpointSecurityGroup
         ServiceName:
           'Fn::Join':
             - '.'
