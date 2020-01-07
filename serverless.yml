@@ -22,7 +22,7 @@ provider:
         - { "Fn::GetAtt": ["LocDynamoDBTable", "Arn" ] }
   environment:
     LOC_TABLE: ${self:custom.locTableName}
-    LOC_TABLE: ${self:custom.mobTableName}
+    MOB_TABLE: ${self:custom.mobTableName}
 
 functions:
   loc:
