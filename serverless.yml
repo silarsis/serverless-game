@@ -5,6 +5,7 @@ org: silarsis
 
 custom:
   locTableName: 'loc-table-${self:provider.stage}'
+  mobTableName: 'mob-table-${self:provider.stage}'
 
 provider:
   name: aws
