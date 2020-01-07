@@ -24,6 +24,17 @@ class Action():
         source_uuid = self.event['source_uuid']
         log.debug("{} has left {}".format(source_uuid, self.uuid))
 
+    def create(self):
+        log.debug("creating a new location")
+        if self.event['type'] == 'Overground':
+            new_loc = Overground({})
+        else:
+            raise TypeError(self.event)
+        if 'back_direction' in self.event:
+            new_loc.add_exit(self.event['back_direction'], self.loc.uuid)
+        self.loc.add_exit(self.event['direction'], new_loc.uuid)
+        table.put_item(Item=new_loc)
+
 
 @contextmanager
 def location(loc_uuid: str):

@@ -4,7 +4,7 @@ app: serverless-game
 org: silarsis
 
 custom:
-  tableName: 'loc-table-${self:provider.stage}'
+  locTableName: 'loc-table-${self:provider.stage}'
 
 provider:
   name: aws
@@ -21,7 +21,8 @@ provider:
       Resource:
         - { "Fn::GetAtt": ["LocDynamoDBTable", "Arn" ] }
   environment:
-    LOC_TABLE: ${self:custom.tableName}
+    LOC_TABLE: ${self:custom.locTableName}
+    LOC_TABLE: ${self:custom.mobTableName}
 
 functions:
   loc:
@@ -162,16 +163,36 @@ resources:
       Properties:
         AttributeDefinitions:
           -
-            AttributeName: locId
+            AttributeName: uuid
             AttributeType: S
         KeySchema:
           -
-            AttributeName: locId
+            AttributeName: uuid
             KeyType: HASH
         ProvisionedThroughput:
           ReadCapacityUnits: 1
           WriteCapacityUnits: 1
-        TableName: ${self:custom.tableName}
+        TableName: ${self:custom.locTableName}
+    # Mob resources
+    MobTopic:
+      Type: AWS::SNS::Topic
+      Properties:
+        TopicName: MobTopic
+    MobDynamoDBTable:
+      Type: 'AWS::DynamoDB::Table'
+      Properties:
+        AttributeDefinitions:
+          -
+            AttributeName: uuid
+            AttributeType: S
+        KeySchema:
+          -
+            AttributeName: uuid
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        TableName: ${self:custom.mobTableName}
   Outputs:
     VpcId:
       Value: !Ref Vpc

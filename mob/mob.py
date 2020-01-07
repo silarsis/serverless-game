@@ -1,7 +1,7 @@
 import uuid
 
 
-class Location:
+class Mob:
     def __init__(self, data: dict):
         self.data = data
         self.dirty = False
@@ -10,19 +10,6 @@ class Location:
 
     def _create(self):
         self.uuid = uuid.uuid4()
-
-    @property
-    def exits(self) -> dict:
-        return self.data['exits']
-
-    @exits.setter
-    def exits(self, value: dict):
-        self.data['exits'] = value
-        self.dirty = True
-
-    def add_exit(self, direction: str, destination: str):
-        self.data['exits'][direction] = destination
-        self.dirty = True
 
     @property
     def uuid(self) -> str:
