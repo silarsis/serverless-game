@@ -26,7 +26,7 @@ provider:
 
 functions:
   loc:
-    handler: loc/handler.hello
+    handler: loc/handler.lambda_handler
     VpcId:
       Ref: Vpc
     package:
@@ -36,6 +36,17 @@ functions:
       - sns:
           arn: !Ref LocTopic
           topicName: LocTopic
+  mob:
+    handler: mob/handler.lambda_handler
+    VpcId:
+      Ref: Vpc
+    package:
+      include:
+        - mob/**
+    events:
+      - sns:
+          arn: !Ref MobTopic
+          topicName: MobTopic
 
 resources:
   Resources:
