@@ -2,7 +2,7 @@
 Events
 ======
 
-Create a new location:
+Create a new location: (This is now incorrect because mixins)
 
 ```yaml
 event:
@@ -16,11 +16,13 @@ Move a mob to a new location:
 
 ```yaml
 event:
-  action: leave
+  action: location.leave
   source_uuid: <mob uuid>
   target_uuid: <uuid of location being left>
+  direction: north
 event2:
-  action: arrive
+  action: location.arrive
   source_uuid: <mob uuid>
   target_uuid: <uuid of location being entered>
+  direction: south
 ```

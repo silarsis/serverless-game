@@ -10,7 +10,7 @@ is sent to the bus:
 
 ```yaml
 event:
-  action: movement.leave
+  action: location.leave
   source_uuid: <mob uuid>
   target_uuid: <uuid of location being left>
   direction: north
