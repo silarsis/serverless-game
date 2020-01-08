@@ -1,5 +1,7 @@
 import uuid
 
+# TODO: Turn this into a mixin / lambda in it's own right
+
 
 class Location:
     def __init__(self, data: dict):

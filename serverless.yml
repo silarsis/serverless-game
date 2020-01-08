@@ -4,8 +4,7 @@ app: serverless-game
 org: silarsis
 
 custom:
-  locTableName: 'loc-table-${self:provider.stage}'
-  mobTableName: 'mob-table-${self:provider.stage}'
+  thingTableName: 'thing-table-${self:provider.stage}'
 
 provider:
   name: aws
@@ -20,14 +19,13 @@ provider:
         - dynamodb:UpdateItem
         - dynamodb:DeleteItem
       Resource:
-        - { "Fn::GetAtt": ["LocDynamoDBTable", "Arn" ] }
+        - { "Fn::GetAtt": ["ThingDynamoDBTable", "Arn" ] }
   environment:
-    LOC_TABLE: ${self:custom.locTableName}
-    MOB_TABLE: ${self:custom.mobTableName}
+    THING_TABLE: ${self:custom.thingTableName}
 
 functions:
-  loc:
-    handler: loc/handler.lambda_handler
+  thing:
+    handler: thing/handler.handler
     VpcId:
       Ref: Vpc
     package:
@@ -35,19 +33,8 @@ functions:
         - loc/**
     events:
       - sns:
-          arn: !Ref LocTopic
-          topicName: LocTopic
-  mob:
-    handler: mob/handler.lambda_handler
-    VpcId:
-      Ref: Vpc
-    package:
-      include:
-        - mob/**
-    events:
-      - sns:
-          arn: !Ref MobTopic
-          topicName: MobTopic
+          arn: !Ref ThingTopic
+          topicName: ThingTopic
 
 resources:
   Resources:
@@ -166,11 +153,11 @@ resources:
               - 'sns'
         VpcId: !Ref Vpc
     # Location resources
-    LocTopic:
+    ThingTopic:
       Type: AWS::SNS::Topic
       Properties:
-        TopicName: LocTopic
-    LocDynamoDBTable:
+        TopicName: ThingTopic
+    ThingDynamoDBTable:
       Type: 'AWS::DynamoDB::Table'
       Properties:
         AttributeDefinitions:
@@ -184,27 +171,7 @@ resources:
         ProvisionedThroughput:
           ReadCapacityUnits: 1
           WriteCapacityUnits: 1
-        TableName: ${self:custom.locTableName}
-    # Mob resources
-    MobTopic:
-      Type: AWS::SNS::Topic
-      Properties:
-        TopicName: MobTopic
-    MobDynamoDBTable:
-      Type: 'AWS::DynamoDB::Table'
-      Properties:
-        AttributeDefinitions:
-          -
-            AttributeName: uuid
-            AttributeType: S
-        KeySchema:
-          -
-            AttributeName: uuid
-            KeyType: HASH
-        ProvisionedThroughput:
-          ReadCapacityUnits: 1
-          WriteCapacityUnits: 1
-        TableName: ${self:custom.mobTableName}
+        TableName: ${self:custom.thingTableName}
   Outputs:
     VpcId:
       Value: !Ref Vpc
