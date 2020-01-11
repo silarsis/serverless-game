@@ -3,6 +3,10 @@ service: serverless-game
 app: serverless-game
 org: silarsis
 
+
+plugins:
+  - serverless-python-requirements
+
 custom:
   thingTableName: 'thing-table-${self:provider.stage}'
 
