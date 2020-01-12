@@ -116,13 +116,14 @@ resources:
             AttributeName: contains
             KeyType: RANGE
         GlobalSecondaryIndexes:
-          IndexName: containing
-          KeySchema:
-            -
-              AttributeName: contains
-              KeyType: RANGE
-              Projection:
-                ProjectionType: ALL
+          -
+            IndexName: containing
+            KeySchema:
+              -
+                AttributeName: contains
+                KeyType: RANGE
+                Projection:
+                  ProjectionType: ALL
         ProvisionedThroughput:
           ReadCapacityUnits: 1
           WriteCapacityUnits: 1
