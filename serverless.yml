@@ -60,7 +60,8 @@ functions:
           arn: !Ref ThingTopic
           topicName: ThingTopic
           filterPolicy:
-            mixin: location
+            mixin:
+              - location
 
 resources:
   Resources:
