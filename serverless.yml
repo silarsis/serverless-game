@@ -121,6 +121,9 @@ resources:
             KeySchema:
               -
                 AttributeName: contains
+                KeyType: HASH
+              -
+                AttributeName: uuid
                 KeyType: RANGE
             Projection:
               ProjectionType: ALL
