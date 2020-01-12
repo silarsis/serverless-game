@@ -1,0 +1,130 @@
+service: serverless-game
+# app and org for use with dashboard.serverless.com
+app: serverless-game-infra
+org: silarsis
+
+provider:
+  name: aws
+  runtime: python3.8
+
+resources:
+  Resources:
+    # VPC and routing
+    Vpc:
+      Type: AWS::EC2::VPC
+      Properties:
+        CidrBlock: 10.0.0.0/16
+        EnableDnsHostnames: true
+        EnableDnsSupport: true
+    PrivateSubnet1:
+      Type: AWS::EC2::Subnet
+      Properties:
+        AvailabilityZone: ap-southeast-1a
+        CidrBlock: 10.0.1.0/24
+        VpcId:
+          Ref: Vpc
+    PrivateSubnet2:
+      Type: AWS::EC2::Subnet
+      Properties:
+        AvailabilityZone: ap-southeast-1b
+        CidrBlock: 10.0.2.0/24
+        VpcId:
+          Ref: Vpc
+    PrivateSubnet3:
+      Type: AWS::EC2::Subnet
+      Properties:
+        AvailabilityZone: ap-southeast-1c
+        CidrBlock: 10.0.3.0/24
+        VpcId:
+          Ref: Vpc
+    InternetGateway:
+      Type: AWS::EC2::InternetGateway
+    VPCGatewayAttachment:
+      Type: AWS::EC2::VPCGatewayAttachment
+      Properties:
+        VpcId:
+          Ref: Vpc
+        InternetGatewayId:
+          Ref: InternetGateway
+    PrivateRouteTable:
+      Type: AWS::EC2::RouteTable
+      Properties:
+        VpcId:
+          Ref: Vpc
+    PrivateRoute:
+      Type: AWS::EC2::Route
+      Properties:
+        RouteTableId:
+          Ref: PrivateRouteTable
+        DestinationCidrBlock: 0.0.0.0/0
+        GatewayId:
+          Ref: InternetGateway
+    SubnetRouteTableAssociationPrivate1:
+      Type: AWS::EC2::SubnetRouteTableAssociation
+      Properties:
+        SubnetId:
+          Ref: PrivateSubnet1
+        RouteTableId:
+          Ref: PrivateRouteTable
+    SubnetRouteTableAssociationPrivate2:
+      Type: AWS::EC2::SubnetRouteTableAssociation
+      Properties:
+        SubnetId:
+          Ref: PrivateSubnet2
+        RouteTableId:
+          Ref: PrivateRouteTable
+    SubnetRouteTableAssociationPrivate3:
+      Type: AWS::EC2::SubnetRouteTableAssociation
+      Properties:
+        SubnetId:
+          Ref: PrivateSubnet3
+        RouteTableId:
+          Ref: PrivateRouteTable
+    EndpointSecurityGroup:
+      Type: AWS::EC2::SecurityGroup
+      Properties:
+        GroupDescription: VPC Interface Endpoint
+        VpcId: !Ref Vpc
+        SecurityGroupIngress:
+          -
+            CidrIp: '10.0.0.0/8'
+            FromPort: 0
+            ToPort: 65535
+            IpProtocol: tcp
+    DynamoDBEndpoint:
+      Type: "AWS::EC2::VPCEndpoint"
+      Properties:
+        RouteTableIds:
+          - !Ref PrivateRouteTable
+        ServiceName:
+          'Fn::Join':
+            - '.'
+            -
+              - 'com.amazonaws'
+              - Ref: 'AWS::Region'
+              - 'dynamodb'
+        VpcId: !Ref Vpc
+    SNSEndpoint:
+      Type: "AWS::EC2::VPCEndpoint"
+      Properties:
+        VpcEndpointType: Interface
+        PrivateDnsEnabled: true
+        SubnetIds:
+          - Ref: PrivateSubnet1
+          - Ref: PrivateSubnet2
+          - Ref: PrivateSubnet3
+        SecurityGroupIds:
+          - Ref: EndpointSecurityGroup
+        ServiceName:
+          'Fn::Join':
+            - '.'
+            -
+              - 'com.amazonaws'
+              - Ref: 'AWS::Region'
+              - 'sns'
+        VpcId: !Ref Vpc
+  Outputs:
+    VpcId:
+      Value: !Ref Vpc
+      Export:
+        Name: ${self:provider.stage}-VpcId

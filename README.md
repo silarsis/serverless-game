@@ -160,3 +160,35 @@ containing (entity, contains) tuples - one for each direct relationship.
 * Location
 * Appearance (needs location to find what's visible)
 * Sound (needs location to find what's audible)
+
+## Callbacks
+
+Say a thing wants to call a mixin, and do something with the results.
+To do this on the event bus, we really want to generate an event with
+a call to the mixin and all the data, plus callback details and data.
+Also need to include a transaction id. So if, for instance, we have a
+"loggedin" mixin that handles pretty printing what's going on to an actual
+user, and it wants to "look". It might send an event:
+
+```yaml
+event:
+  tid: <uuid of transaction>
+  target_uuid: <uuid of location player is in>
+  mixin: location
+  action: list_contained
+  callback: pretty_print
+  callback_data:
+    user: derrick
+```
+
+This will call the "list_contained" action, and it will send an event that
+has all the data it's meant to provide, plus the callback data, plus retaining
+the transaction id (tid).
+
+The loggedin mixin will implement a "pretty_print" action that takes that data
+and presents it back to the user (presume the "user" in callback_data is a key
+to find that user's websocket).
+
+For this to work, we need a series of convenience methods on the underlying
+objects, for returning data in a consistent way, for packaging up callback data.
+We also introduce a callback style of coding to our mixins, unfortunately.
