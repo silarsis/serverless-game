@@ -33,8 +33,12 @@ functions:
     VpcId:
       Ref: Vpc
     package:
+      exclude:
+        - ./**
       include:
-        - loc/**
+        - lib/**
+        - ./__init__.py
+        - thing/**
     events:
       - sns:
           arn: !Ref ThingTopic
