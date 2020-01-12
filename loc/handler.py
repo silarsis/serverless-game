@@ -1,5 +1,5 @@
 import json
-import log
+import logging
 import boto3
 from os import environ
 from contextlib import contextmanager
@@ -18,14 +18,14 @@ class Action():
 
     def arrive(self):
         source_uuid = self.event['source_uuid']
-        log.debug("{} has arrived in {}".format(source_uuid, self.uuid))
+        logging.debug("{} has arrived in {}".format(source_uuid, self.uuid))
 
     def leave(self):
         source_uuid = self.event['source_uuid']
-        log.debug("{} has left {}".format(source_uuid, self.uuid))
+        logging.debug("{} has left {}".format(source_uuid, self.uuid))
 
     def create(self):
-        log.debug("creating a new location")
+        logging.debug("creating a new location")
         if self.event['type'] == 'Overground':
             new_loc = Overground({})
         else:

@@ -1,9 +1,9 @@
 import json
-import log
+import logging
 import boto3
 from os import environ
 from contextlib import contextmanager
-from thing import Thing
+from .thing import Thing
 
 table = boto3.resource('dynamodb').Table(environ.get('THING_TABLE'))
 
@@ -21,8 +21,8 @@ class Action():
             self.target.mixins[mixin](verb, self.event)
 
     def create(self):
-        log.debug("creating a new thing")
-        new_thing = Thing({})
+        logging.debug("creating a new thing")
+        new_thing = Thing()
         new_thing._save()
 
 
