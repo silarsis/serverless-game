@@ -1,46 +1,25 @@
-import uuid
-import boto3
-import environ
+from os import environ
+from ..lib import state
+from typing import Callable, Dict
 
 
-table = boto3.resource('dynamodb').Table(environ.get('THING_TABLE'))
-
-
-class Thing:
-    def __init__(self, data: dict):
-        self.data = data
-        self.dirty = False
-        if not self.data:
-            self._create()
-
-    def _create(self):
-        self.uuid = uuid.uuid4()
-        self.data['mixins'] = {}
-        self.dirty = True
-
-    def _save(self):
-        if self.dirty:
-            table.put_item(Item=self.data)
-            self.dirty = False
+class Thing(state.State):
+    def __init__(self, uuid: str = None):
+        super().__init__(uuid, environ['THING_TABLE'])
 
     @property
-    def uuid(self) -> str:
-        return str(self.data['uuid'])
-
-    @uuid.setter
-    def uuid(self, value: str):
-        self.data['uuid'] = value
-        self.dirty = True
-
-    @property
-    def mixins(self):
+    def mixins(self) -> Dict[str, Callable]:
+        if 'mixins' not in self.data:
+            self.data['mixins'] = {}
+            self.dirty = True
         return self.data['mixins']
 
-    def add_mixin(self, mixin):
+    def add_mixin(self, mixin: str) -> None:
+        # This will become an AWS lambda call eventually
         self.data['mixins'][mixin] = lambda x: \
             print("called mixin {} for {}".format(mixin, x))
         self.dirty = True
 
-    def remove_mixin(self, mixin):
+    def remove_mixin(self, mixin: str) -> None:
         del(self.data['mixins'][mixin])
         self.dirty = True
