@@ -7,7 +7,7 @@
     "lib": "lib"
   },
   "scripts": {
-    "test": "pytest"
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
     "type": "git",
