@@ -115,21 +115,6 @@ resources:
           -
             AttributeName: contains
             KeyType: RANGE
-        GlobalSecondaryIndexes:
-          -
-            IndexName: containing
-            KeySchema:
-              -
-                AttributeName: contains
-                KeyType: HASH
-              -
-                AttributeName: uuid
-                KeyType: RANGE
-            Projection:
-              ProjectionType: ALL
-            ProvisionedThroughput:
-              ReadCapacityUnits: 1
-              WriteCapacityUnits: 1
         ProvisionedThroughput:
           ReadCapacityUnits: 1
           WriteCapacityUnits: 1
