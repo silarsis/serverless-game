@@ -205,8 +205,10 @@ event:
   target_uuid: <uuid of location player is in>
   aspect: location
   action: list_contained
-  callback: pretty_print
   callback_data:
+    aspect: location
+    action: pretty_print
+    actor_uuid: <uuid of player>
     user: derrick
 ```
 
@@ -215,9 +217,26 @@ has all the data it's meant to provide, plus the callback data, plus retaining
 the transaction id (tid).
 
 The loggedin aspect will implement a "pretty_print" action that takes that data
-and presents it back to the user (presume the "user" in callback_data is a key
-to find that user's websocket).
+and presents it back to the user (presume the "user" in callback_data is some data
+already calculated and needing to be in the return).
 
 For this to work, we need a series of convenience methods on the underlying
 objects, for returning data in a consistent way, for packaging up callback data.
 We also introduce a callback style of coding to our aspects, unfortunately.
+
+# Event Structure
+
+```yaml
+event:
+  tid: str transaction ID, mandatory
+  aspect: str name of action, mandatory
+  action: str name of action, mandatory
+  uuid: str name of "self", mandatory
+  data: {} optional
+  callback: optional
+    aspect: str
+    action: str
+    uuid: str
+    data: {}
+
+```
