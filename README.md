@@ -24,9 +24,13 @@ When a message is received, the entity is loaded from DynamoDB and a check
 is made to see if that entity has that mixin. If it does, then the action
 is triggered.
 
+Each mixin will have it's own table of data - so all the data and methods for
+a given object are actually spread across multiple databases and mixins, all
+of which only care about their own concerns.
+
 This way, mixins can be added and removed easily - add a lambda and SNS
 subscription, and add the mixin to the appropriate objects in DynamoDB
-(or, technically, a mixin could ignore the and just fire anyway).
+(or, technically, a mixin could ignore that and just fire anyway).
 
 This also allows for a mixin to fire on an action regardless of the mixin.
 For example, we might implement "look" as an event with an action of "look",
@@ -45,6 +49,31 @@ cause a slew of events in response, which theoretically something would be
 listening for and collating to send back.
 
 ## Interactions
+
+Interactions can be classified in two ways: synchronous vs asychronous,
+and information vs command. I may be slightly loose with those definitions
+because really by "synchronous" I mean "go do that thing and then I'll do my
+thing".
+
+Async interactions are just events - there is a helper on the base class
+that supports throwing events onto the bus, while also tracking a transaction
+ID and making default values right.  (`_sendEvent`). This applies to both
+information and command events.
+
+Synchronous events - commands or information - are supported via a callback
+mechanism. Again, the `_sendEvent` method is used, but two extra parameters
+are provided, for the name of the callback method and the extra data to carry
+for state.
+
+So, if you want to change another entity, you throw an event that triggers
+an action on that entity. If you have changed your own state, you throw
+an event to indicate that, in case other entities want to do something about
+it. If you want to get information about another entity, you throw an event
+that triggers an action on that entity and also provides a callback for the
+method to go to once that data is there.
+
+How do we do aggregates? I think it'll probably require aggregation objects,
+but let's chase that through and see as we build it.
 
 Interactions between entities should take one of three forms:
 
