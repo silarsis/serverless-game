@@ -17,9 +17,12 @@ var/
 *.egg
 .tox/
 .mypy_cache/
+.pytest_cache/
+**__pycache__/
 
 # Serverless directories
 .serverless
 
 # Visual Studio Code
 .vscode/
+.history/
