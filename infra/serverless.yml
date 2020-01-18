@@ -3,9 +3,13 @@ service: serverless-game-infra
 app: serverless-game-infra
 org: silarsis
 
+custom:
+  defaultRegion: ap-southeast-1
+
 provider:
   name: aws
   runtime: python3.8
+  region: ${opt:region, self:custom.defaultRegion}
 
 resources:
   Resources:

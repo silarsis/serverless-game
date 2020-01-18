@@ -5,6 +5,7 @@ org: silarsis
 
 
 custom:
+  defaultRegion: ap-southeast-1
   thingTableName: 'thing-table-${self:provider.stage}'
   locationTableName: 'location-table-${self:provider.stage}'
   contentsTableName: 'contents-table-${self:provider.stage}'
@@ -14,6 +15,7 @@ custom:
 provider:
   name: aws
   runtime: python3.8
+  region: ${opt:region, self:custom.defaultRegion}
   iamRoleStatements:
     - Effect: Allow
       Action:
