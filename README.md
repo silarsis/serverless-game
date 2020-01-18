@@ -4,13 +4,13 @@ Toy game world with events and lambdas
 
 Design Thoughts:
 
-Rather than an object hierarchy, I want to use mixins. However, I think the
-mixins should be lambdas in their own right. So, the idea is that an event
+Rather than an object hierarchy, I want to use aspects. However, I think the
+aspects should be lambdas in their own right. So, the idea is that an event
 is sent to the bus:
 
 ```yaml
 event:
-  mixin: location
+  aspect: location
   action: leave
   actor_uuid: <mob uuid>
   leaving_uuid: <location uuid>
@@ -19,32 +19,32 @@ event:
 
 The actor_uuid is used to determine which object is being moved, in this case.
 
-The mixins listen to the bus directly, using filters on the SNS subscribe.
+The aspects listen to the bus directly, using filters on the SNS subscribe.
 When a message is received, the entity is loaded from DynamoDB and a check
-is made to see if that entity has that mixin. If it does, then the action
+is made to see if that entity has that aspect. If it does, then the action
 is triggered.
 
-Each mixin will have it's own table of data - so all the data and methods for
-a given object are actually spread across multiple databases and mixins, all
+Each aspect will have it's own table of data - so all the data and methods for
+a given object are actually spread across multiple databases and aspects, all
 of which only care about their own concerns.
 
-This way, mixins can be added and removed easily - add a lambda and SNS
-subscription, and add the mixin to the appropriate objects in DynamoDB
-(or, technically, a mixin could ignore that and just fire anyway).
+This way, aspects can be added and removed easily - add a lambda and SNS
+subscription, and add the aspect to the appropriate objects in DynamoDB
+(or, technically, a aspect could ignore that and just fire anyway).
 
-This also allows for a mixin to fire on an action regardless of the mixin.
+This also allows for a aspect to fire on an action regardless of the aspect.
 For example, we might implement "look" as an event with an action of "look",
-that every mixin can respond to:
+that every aspect can respond to:
 
 ```yaml
 event:
-  mixin: player
+  aspect: player
   action: look
   actor_uuid: <mob uuid>
 ```
 
-This is a generic "look around". Theoretically, a whole bunch of mixins could
-respond to this, by filtering for the action and not the mixin. This would
+This is a generic "look around". Theoretically, a whole bunch of aspects could
+respond to this, by filtering for the action and not the aspect. This would
 cause a slew of events in response, which theoretically something would be
 listening for and collating to send back.
 
@@ -98,9 +98,9 @@ event-based webhook.
 
 ```yaml
 event:
-  mixin: entity
+  aspect: entity
   action: create
-  mixins:
+  aspects:
     - mob
   request_uuid: <uuid of this request>
 ```
@@ -112,7 +112,7 @@ This will cause the following sequence of events:
 
 ```yaml
 event:
-  mixin: entity
+  aspect: entity
   action: created
   request_uuid: <uuid of the request>
   new_uuid: <uuid of the new entity>
@@ -123,7 +123,7 @@ the event bus. Think more.
 
 ```yaml
 event:
-  mixin: location
+  aspect: location
   action: arrive
   actor_uuid: <mob uuid>
   target_uuid: <location uuid>
@@ -131,7 +131,7 @@ event:
 
 ```yaml
 event:
-  mixin: movement
+  aspect: movement
   action: arrive
   actor_uuid: <mob uuid>
   target_uuid: <location uuid>
@@ -141,12 +141,12 @@ event:
 
 ```yaml
 event:
-  mixin: movement
+  aspect: movement
   action: leave
   actor_uuid: <mob uuid>
   direction: <str>
 event:
-  mixin: movement
+  aspect: movement
   action: arrive
   actor_uuid: <mob uuid>
   target_uuid: <new location uuid>
@@ -156,11 +156,11 @@ event:
 
 This one is interesting. The actor says something - the event with the speech
 is thrown out for anyone to listen to, but how do you know what can hear it?
-The mixin will
+The aspect will
 
 ```yaml
 event:
-  mixin: sound
+  aspect: sound
   action: say
   actor_uuid: <mob uuid>
   location_uuid: <location uuid>
@@ -173,7 +173,7 @@ event:
 
 An entity can be "in" a location. A location can "contain" entities. Note that
 a location is just an entity that can hold other entities (it has the "location"
-mixin).
+aspect).
 
 Do we store both of these - entity with a link to location, and location with
 a link to entities?
@@ -181,10 +181,10 @@ a link to entities?
 Or do we store the relationships somewhere - a list of "entities inside other
 entities" - somehow?
 
-I'm actually inclined to say the "location" mixin has it's own dynamodb table
+I'm actually inclined to say the "location" aspect has it's own dynamodb table
 containing (entity, contains) tuples - one for each direct relationship.
 
-## Concepts / required mixins
+## Concepts / required aspects
 
 * Location
 * Appearance (needs location to find what's visible)
@@ -192,18 +192,18 @@ containing (entity, contains) tuples - one for each direct relationship.
 
 ## Callbacks
 
-Say a thing wants to call a mixin, and do something with the results.
+Say a thing wants to call a aspect, and do something with the results.
 To do this on the event bus, we really want to generate an event with
-a call to the mixin and all the data, plus callback details and data.
+a call to the aspect and all the data, plus callback details and data.
 Also need to include a transaction id. So if, for instance, we have a
-"loggedin" mixin that handles pretty printing what's going on to an actual
+"loggedin" aspect that handles pretty printing what's going on to an actual
 user, and it wants to "look". It might send an event:
 
 ```yaml
 event:
   tid: <uuid of transaction>
   target_uuid: <uuid of location player is in>
-  mixin: location
+  aspect: location
   action: list_contained
   callback: pretty_print
   callback_data:
@@ -214,10 +214,10 @@ This will call the "list_contained" action, and it will send an event that
 has all the data it's meant to provide, plus the callback data, plus retaining
 the transaction id (tid).
 
-The loggedin mixin will implement a "pretty_print" action that takes that data
+The loggedin aspect will implement a "pretty_print" action that takes that data
 and presents it back to the user (presume the "user" in callback_data is a key
 to find that user's websocket).
 
 For this to work, we need a series of convenience methods on the underlying
 objects, for returning data in a consistent way, for packaging up callback data.
-We also introduce a callback style of coding to our mixins, unfortunately.
+We also introduce a callback style of coding to our aspects, unfortunately.

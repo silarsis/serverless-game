@@ -9,15 +9,15 @@ EventType = Dict[str, Any]  # Actually needs to be json-able
 
 
 class Tell:
-    def __init__(self, _sendEvent, mixin, uuid):
+    def __init__(self, _sendEvent, aspect, uuid):
         self._sendEvent = _sendEvent
-        self.mixin = mixin
+        self.aspect = aspect
         self.uuid = uuid
 
     def to(self, action, **kwargs):
         event = {
             'actor_uuid': self.uuid,
-            'mixin': self.mixin,
+            'aspect': self.aspect,
             'action': action
         }
         event.update(kwargs)
@@ -107,5 +107,5 @@ class Thing(UserDict):
             actor._sendEvent(response)
         actor._save()
 
-    def tell(self, mixin, uuid):
-        return Tell(self._sendEvent, mixin, uuid)
+    def tell(self, aspect, uuid):
+        return Tell(self._sendEvent, aspect, uuid)

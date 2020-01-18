@@ -6,7 +6,7 @@ from .handler import lambdaHandler
 
 
 class Location(Thing):
-    " All location aware things will have a Location mixin "
+    " All location aware things will have a Location aspect "
     _tableName = 'LOCATION_TABLE'
 
     def __init__(self, uuid: str = None, tid: str = None):

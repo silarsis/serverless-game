@@ -34,7 +34,7 @@ provider:
 
 functions:
   thing:
-    handler: mixins/thing.handler
+    handler: aspects/thing.handler
     VpcId:
       Ref:
         Fn::ImportValue: VpcId
@@ -42,13 +42,13 @@ functions:
       exclude:
         - ./**
       include:
-        - mixins/**
+        - aspects/**
     events:
       - sns:
           arn: !Ref ThingTopic
           topicName: ThingTopic
   location:
-    handler: mixins/location.handler
+    handler: aspects/location.handler
     VpcId:
       Ref:
         Fn::ImportValue: VpcId
@@ -56,13 +56,13 @@ functions:
       exclude:
         - ./**
       include:
-        - mixins/**
+        - aspects/**
     events:
       - sns:
           arn: !Ref ThingTopic
           topicName: ThingTopic
           filterPolicy:
-            mixin:
+            aspect:
               - location
 
 resources:
