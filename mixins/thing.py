@@ -1,32 +1,66 @@
 import boto3
-import uuid
+from uuid import uuid4
+import json
 from os import environ
 from typing import Dict, Any
+from collections import UserDict
+
+EventType = Dict[str, Any]  # Actually needs to be json-able
 
 
-class Thing:
-    _tableName = ''  # Set this in the subclass
+class Tell:
+    def __init__(self, _sendEvent, mixin, uuid):
+        self._sendEvent = _sendEvent
+        self.mixin = mixin
+        self.uuid = uuid
 
-    def __init__(self, uuid: str = None):
+    def to(self, action, **kwargs):
+        event = {
+            'actor_uuid': self.uuid,
+            'mixin': self.mixin,
+            'action': action
+        }
+        event.update(kwargs)
+        self._sendEvent(event)
+
+
+class Thing(UserDict):
+    " Thing objects have state (stored in dynamo) and know how to event and callback "
+    _tableName: str = ''  # Set this in the subclass
+
+    def __init__(self, uuid: str = None, tid: str = None):
+        super().__init__()
         assert(self._tableName)
-        self.table = boto3.resource('dynamodb').Table(environ[self._tableName])
-        self.data: Dict[str, Any] = {}
+        self._table = boto3.resource('dynamodb').Table(environ[self._tableName])
+        self._topic = boto3.resource('sns').Topic(environ['THING_TOPIC'])
+        self._tid: str = tid or str(uuid4())
         if uuid:
             self._load(uuid)
         else:
-            self._create()
+            self.create()
         assert(self.data)
         assert(self.uuid)
 
-    def _create(self) -> None:
-        self.uuid = uuid.uuid4()
+    def create(self) -> None:
+        " Generally subclasses of Thing will set up data in their own create() then call super().create() "
+        self.uuid = str(uuid4())
         self._save()
 
-    def _save(self) -> None:
-        self.table.put_item(Item=self.data)
+    def destroy(self) -> None:
+        self._table.delete_item(Key={'uuid': self.uuid})
+
+    def tick(self) -> None:
+        pass
 
     def _load(self, uuid: str) -> None:
-        self.data = self.table.get_item(Key={'uuid': uuid}).get('Item', {})
+        self.data: Dict = self._table.get_item(Key={'uuid': uuid}).get('Item', {})
+
+    def _save(self) -> None:
+        self._table.put_item(Item=self.data)
+
+    @property
+    def tid(self) -> str:
+        return self._tid
 
     @property
     def uuid(self) -> str:
@@ -36,20 +70,42 @@ class Thing:
     def uuid(self, value: str) -> None:
         self.data['uuid'] = value
 
-    def _sendEvent(self, event: Dict[str, Any], origEvent: Dict[str, Any]):
-        tid = str(origEvent.get('tid') or uuid.uuid4())
-        sendEvent = {
-            'tid': tid,
+    def _sendEvent(self, event: EventType) -> str:
+        sendEvent: Dict = {
+            'default': '',
+            'tid': self.tid,
             'actor_uuid': self.data['uuid']
         }
         sendEvent.update(event)
-        # Send the actual event onto the SNS bus
+        return self._topic.publish(
+            Message=json.dumps(sendEvent),
+            MessageStructure='json'
+        )
+
+    def _callback(self, event: EventType, callback: str, data: EventType) -> str:
+        """
+        Send an event, request a callback when done.
+
+        event: the event to call
+        callback: our action to call when done
+        data: the data to add to the callback to carry state
+        """
+        sendEvent: Dict = {
+            'callback': callback,
+            'callback_data': data
+        }
+        sendEvent.update(event)
+        return self._sendEvent(event)
 
     @classmethod
-    def _action(cls, event: Dict):  # This is not state related
+    def _action(cls, event: EventType):  # This is not state related
         uuid = event['actor_uuid']
-        actor = cls(uuid)
-        response = getattr(actor, event['action'])(event)
+        tid = str(event.get('tid') or uuid4())
+        actor = cls(uuid, tid)
+        response: EventType = getattr(actor, event['action'])(event)
         if response:
-            actor._sendEvent(response, event)
+            actor._sendEvent(response)
         actor._save()
+
+    def tell(self, mixin, uuid):
+        return Tell(self._sendEvent, mixin, uuid)
