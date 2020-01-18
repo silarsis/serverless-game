@@ -4,13 +4,15 @@ import json
 from os import environ
 from typing import Dict, Any
 from collections import UserDict
+import copy
 
 EventType = Dict[str, Any]  # Actually needs to be json-able
 
 
 class Tell:
-    def __init__(self, _sendEvent, aspect, uuid):
+    def __init__(self, _sendEvent, _callback, aspect, uuid):
         self._sendEvent = _sendEvent
+        self._callback = _callback
         self.aspect = aspect
         self.uuid = uuid
 
@@ -22,6 +24,19 @@ class Tell:
         }
         event.update(kwargs)
         self._sendEvent(event)
+
+    def for(self, action, **kwargs):
+        event = {
+            'actor_uuid': self.uuid,
+            'aspect': self.aspect,
+            'action': action
+        }
+        event.update(kwargs)
+        self._callback(event)
+
+    def now(self):
+        send
+
 
 
 class Thing(UserDict):
@@ -76,13 +91,13 @@ class Thing(UserDict):
             'tid': self.tid,
             'actor_uuid': self.data['uuid']
         }
-        sendEvent.update(event)
+        sendEvent.update(event or {})
         return self._topic.publish(
             Message=json.dumps(sendEvent),
             MessageStructure='json'
         )
 
-    def _callback(self, event: EventType, callback: str, data: EventType) -> str:
+    def _callback(self, event: EventType, callback: str, data: EventType = {}) -> str:
         """
         Send an event, request a callback when done.
 
@@ -90,12 +105,20 @@ class Thing(UserDict):
         callback: our action to call when done
         data: the data to add to the callback to carry state
         """
+        callback_data = copy.deepcopy(data)
+        callback_data.setdefault('actor_uuid', self.uuid)
         sendEvent: Dict = {
             'callback': callback,
-            'callback_data': data
+            'callback_data': callback_data
         }
         sendEvent.update(event)
         return self._sendEvent(event)
+
+    @classmethod
+    def _createCallbackEvent(cls, response: Dict, event: Dict):
+        event = copy.deepcopy(event['callback_data'])
+        event.update(response)
+        return event
 
     @classmethod
     def _action(cls, event: EventType):  # This is not state related
@@ -103,8 +126,9 @@ class Thing(UserDict):
         tid = str(event.get('tid') or uuid4())
         actor = cls(uuid, tid)
         response: EventType = getattr(actor, event['action'])(event)
-        if response:
-            actor._sendEvent(response)
+        if event.get('callback'):
+            actor._sendEvent(cls._createCallbackEvent(response, event))
+        event.get('callback', actor._sendEvent)(response)
         actor._save()
 
     def tell(self, aspect, uuid):
