@@ -5,38 +5,41 @@ from os import environ
 from typing import Dict, Any
 from collections import UserDict
 import copy
+import logging
+import importlib
 
 EventType = Dict[str, Any]  # Actually needs to be json-able
 
 
-class Tell:
-    def __init__(self, _sendEvent, _callback, aspect, uuid):
-        self._sendEvent = _sendEvent
-        self._callback = _callback
-        self.aspect = aspect
-        self.uuid = uuid
+class Call(UserDict):
+    def __init__(self, tid: str, originator: str, uuid: str, aspect: str, action: str, **kwargs):
+        self._topic = boto3.resource('sns').Topic(environ['THING_TOPIC'])
+        self._originating_uuid = originator
+        self.data['tid'] = tid
+        self.data['aspect'] = aspect
+        self.data['uuid'] = uuid
+        self.data['action'] = action
+        self.data['data'] = kwargs
 
-    def to(self, action, **kwargs):
-        event = {
-            'actor_uuid': self.uuid,
-            'aspect': self.aspect,
-            'action': action
+    def thencall(self, aspect: str, action: str, uuid: str, **kwargs: Dict):
+        assert(self._originating_uuid)
+        callback = {
+            'tid': self['tid'],
+            'aspect': aspect,
+            'action': action,
+            'uuid': self._originating_uuid,
+            'data': kwargs
         }
-        event.update(kwargs)
-        self._sendEvent(event)
+        d = self.data
+        while 'callback' in d:
+            d = d['callback']
+        d['callback'] = callback
 
-    def for(self, action, **kwargs):
-        event = {
-            'actor_uuid': self.uuid,
-            'aspect': self.aspect,
-            'action': action
-        }
-        event.update(kwargs)
-        self._callback(event)
-
-    def now(self):
-        send
-
+    def now(self) -> None:
+        return self._topic.publish(
+            Message=json.dumps(self.data),
+            MessageStructure='json'
+        )
 
 
 class Thing(UserDict):
@@ -49,6 +52,7 @@ class Thing(UserDict):
         self._table = boto3.resource('dynamodb').Table(environ[self._tableName])
         self._topic = boto3.resource('sns').Topic(environ['THING_TOPIC'])
         self._tid: str = tid or str(uuid4())
+        self.uuid = uuid or str(uuid4())
         if uuid:
             self._load(uuid)
         else:
@@ -57,15 +61,18 @@ class Thing(UserDict):
         assert(self.uuid)
 
     def create(self) -> None:
-        " Generally subclasses of Thing will set up data in their own create() then call super().create() "
-        self.uuid = str(uuid4())
         self._save()
 
     def destroy(self) -> None:
         self._table.delete_item(Key={'uuid': self.uuid})
+        logging.debug("{} has been destroyed".format(self.uuid))
 
     def tick(self) -> None:
-        pass
+        " This should be called as a super call at the start of tick "
+        self.tid = str(uuid4())  # Each new tick is a new transaction
+
+    def aspect(self, aspect: str):
+        return getattr(importlib.import_module(aspect.lower()), aspect)(self.uuid, self.tid)
 
     def _load(self, uuid: str) -> None:
         self.data: Dict = self._table.get_item(Key={'uuid': uuid}).get('Item', {})
@@ -76,6 +83,10 @@ class Thing(UserDict):
     @property
     def tid(self) -> str:
         return self._tid
+
+    @tid.setter
+    def tid(self, value: str) -> None:
+        self._tid = value
 
     @property
     def uuid(self) -> str:
@@ -97,23 +108,6 @@ class Thing(UserDict):
             MessageStructure='json'
         )
 
-    def _callback(self, event: EventType, callback: str, data: EventType = {}) -> str:
-        """
-        Send an event, request a callback when done.
-
-        event: the event to call
-        callback: our action to call when done
-        data: the data to add to the callback to carry state
-        """
-        callback_data = copy.deepcopy(data)
-        callback_data.setdefault('actor_uuid', self.uuid)
-        sendEvent: Dict = {
-            'callback': callback,
-            'callback_data': callback_data
-        }
-        sendEvent.update(event)
-        return self._sendEvent(event)
-
     @classmethod
     def _createCallbackEvent(cls, response: Dict, event: Dict):
         event = copy.deepcopy(event['callback_data'])
@@ -122,14 +116,24 @@ class Thing(UserDict):
 
     @classmethod
     def _action(cls, event: EventType):  # This is not state related
-        uuid = event['actor_uuid']
+        assert(not event['action'].startswith('_'))
+        uuid = event['uuid']
         tid = str(event.get('tid') or uuid4())
         actor = cls(uuid, tid)
-        response: EventType = getattr(actor, event['action'])(event)
+        response: EventType = getattr(actor, event['action'])(**event['data'])
         if event.get('callback'):
-            actor._sendEvent(cls._createCallbackEvent(response, event))
-        event.get('callback', actor._sendEvent)(response)
+            c = event['callback']
+            data = c['data']
+            data.update(response or {})
+            Call(c['tid'], '', c['uuid'], c['aspect'], c['action'], **data).now()
         actor._save()
 
-    def tell(self, aspect, uuid):
-        return Tell(self._sendEvent, aspect, uuid)
+    def call(self, uuid: str, aspect: str, action: str, **kwargs):
+        " call('42', 'mobile', 'arrive', destination='68').now() "
+        return Call(self.tid, self.uuid, aspect, action, **kwargs)
+
+    def callAspect(self, aspect: str, action: str, **kwargs):
+        return self.call(self.uuid, aspect, action, **kwargs)
+
+    def createAspect(self, aspect: str) -> None:
+        self.call(self.uuid, aspect, 'create')

@@ -3,6 +3,7 @@ import boto3
 from boto3.dynamodb.conditions import Key
 import logging
 from .handler import lambdaHandler
+from typing import List, Dict
 
 
 class Location(Thing):
@@ -12,44 +13,64 @@ class Location(Thing):
     def __init__(self, uuid: str = None, tid: str = None):
         super().__init__(uuid, tid)
         self._contents = boto3.resource('dynamodb').Table('CONTENTS_TABLE')
+        self._locations = boto3.resource('dynamodb').Table('LOCATIONS_TABLE')
         self._condition = Key('uuid').eq(self.uuid)
 
     @property
-    def exits(self) -> dict:
+    def exits(self) -> Dict[str, str]:
         return self.data['exits']
 
-    @exits.setter
-    def exits(self, value: dict):
-        self.data['exits'] = value
-        self.dirty = True
-
-    def add_exit(self, direction: str, destination: str):
+    def add_exit(self, direction: str, destination: str) -> Dict[str, str]:
         self.data['exits'][direction] = destination
         self.dirty = True
+        return self.data['exits']
+
+    def remove_exit(self, direction: str) -> Dict[str, str]:
+        if direction in self.data['exits']:
+            del(self.data['exits'][direction])
+            self.dirty = True
+        return self.data['exits']
 
     @property
-    def contents(self):
-        c = self._contents.query(KeyConditionExpression=self._condition)
-        return [item['contains'] for item in c['Items']]
+    def contents(self) -> List[str]:
+        contents = self._contents.query(KeyConditionExpression=self._condition)
+        return [item['contains'] for item in contents['Items']]
 
-    @contents.setter
-    def contents(self, value: list):
-        raise AttributeError("Should not set contents - arrive and leave items")
+    def add_contents(self, value: str) -> None:
+        self._contents.put_item(
+            Item={'uuid': self.uuid, 'contains': value}
+        )
+        logging.debug("{} now contains {}".format(self.uuid, value))
 
-    def arrive(self):
-        actor_uuid = self.event['actor_uuid']
-        self._content.put_item(
-            Item={'uuid': self.uuid, 'contains': actor_uuid})
-        logging.debug("{} has arrived in {}".format(actor_uuid, self.uuid))
+    def remove_contents(self, value: str) -> None:
+        self._contents.delete_item(
+            Key={'uuid': self.uuid, 'contains': value}
+        )
+        logging.debug("{} no longer contains {}".format(self.uuid, value))
 
-    def left(self):
-        actor_uuid = self.event['actor_uuid']
-        self._content.delete_item(
-            Key={'uuid': self.uuid, 'contains': actor_uuid})
-        logging.debug("{} has left {}".format(actor_uuid, self.uuid))
+    @property
+    def locations(self) -> List[str]:
+        locations = self._locations.get_item(KeyConditionExpression=self._condition)
+        return [item['location'] for item in locations['Items']]
+
+    def add_location(self, value: str):
+        self._locations.put_item(
+            Item={'uuid': self.uuid, 'location': value}
+        )
+        logging.debug("{} is now located in {}".format(self.uuid, value))
+
+    def remove_location(self, value: str):
+        self._locations.delete_item(
+            Key={'uuid': self.uuid, 'location': value}
+        )
+        logging.debug("{} is no longer located in {}".format(self.uuid, value))
+
+    def move(self, from_loc: str, to_loc: str):
+        self.add_location(to_loc)
+        self.remove_location(from_loc)
 
     def create(self):
-        self.exits = {}
+        self.data['exits'] = {}
         super().create()
 
     def destroy(self):
