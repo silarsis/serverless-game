@@ -8,6 +8,7 @@ custom:
   thingTableName: 'thing-table-${self:provider.stage}'
   locationTableName: 'location-table-${self:provider.stage}'
   contentsTableName: 'contents-table-${self:provider.stage}'
+  thingTopic: 'thing-topic-${self:provider.stage}'
 
 provider:
   name: aws
@@ -29,6 +30,7 @@ provider:
     THING_TABLE: ${self:custom.thingTableName}
     LOCATION_TABLE: ${self:custom.locationTableName}
     CONTENTS_TABLE: ${self:custom.contentsTableName}
+    THING_TOPIC: ${self:custom.thingTopic}
 
 functions:
   thing:
@@ -68,7 +70,7 @@ resources:
     ThingTopic:
       Type: AWS::SNS::Topic
       Properties:
-        TopicName: ThingTopic
+        TopicName: ${self:custom.thingTopic}
     ThingDynamoDBTable:
       Type: 'AWS::DynamoDB::Table'
       Properties:
