@@ -30,14 +30,12 @@ class TestThing(unittest.TestCase):
             thing.Thing()
 
     @mock_dynamodb2
-    @mock_sns
     def test_keyerror_on_load_nonexistent(self):
         self._createTestTable()
         with self.assertRaises(KeyError):
             ThingTestClass('uuid', 'tid')
 
     @mock_dynamodb2
-    @mock_sns
     def test_create(self):
         self._createTestTable()
         t = ThingTestClass('', 'tid')
@@ -45,7 +43,6 @@ class TestThing(unittest.TestCase):
         self.assertNotEqual(t.uuid, '')
 
     @mock_dynamodb2
-    @mock_sns
     def test_load(self):
         self._createTestTable()
         t = ThingTestClass('', 'tid')
@@ -56,7 +53,6 @@ class TestThing(unittest.TestCase):
         self.assertEqual(t.uuid, uuid)
 
     @mock_dynamodb2
-    @mock_sns
     def test_destroy(self):
         self._createTestTable()
         t = ThingTestClass('', 'tid')
@@ -66,7 +62,6 @@ class TestThing(unittest.TestCase):
             t = ThingTestClass(uuid, 'tid2')
 
     @mock_dynamodb2
-    @mock_sns
     def test_tick(self):
         self._createTestTable()
         t = ThingTestClass('', 'tid')
@@ -74,10 +69,17 @@ class TestThing(unittest.TestCase):
         self.assertNotEqual(t.tid, 'tid')
 
     @mock_dynamodb2
-    @mock_sns
     def test_prohibited_sets(self):
         self._createTestTable()
         t = ThingTestClass('', 'tid')
         with self.assertRaises(AttributeError):
             t.tid = 'test'
             t.uuid = 'test'
+
+    @mock_dynamodb2
+    def test_aspectName(self):
+        self._createTestTable()
+        t = ThingTestClass('', 'tid')
+        self.assertEqual(t.aspectName, 'ThingTestClass')
+
+# TODO: Test aspect and all the eventing code (_sendEvent and callback and such)

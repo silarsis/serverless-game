@@ -4,11 +4,19 @@ import json
 from os import environ
 from typing import Dict, Any
 from collections import UserDict
-import copy
 import logging
 import importlib
 
 EventType = Dict[str, Any]  # Actually needs to be json-able
+
+
+def callable(func):
+    # TODO: Can this be made to keep a register for use by lambdaHandler?
+    def wrapper(*args, **kwargs):
+        result: dict = func(*args, **kwargs)
+        assert(isinstance(result, dict) or result is None)
+        return result
+    return wrapper
 
 
 class Call(UserDict):
@@ -21,7 +29,7 @@ class Call(UserDict):
         self.data['action'] = action
         self.data['data'] = kwargs
 
-    def thencall(self, aspect: str, action: str, uuid: str, **kwargs: Dict):
+    def thenCall(self, aspect: str, action: str, uuid: str, **kwargs: Dict) -> 'Call':
         assert(self._originating_uuid)
         callback = {
             'tid': self['tid'],
@@ -34,6 +42,7 @@ class Call(UserDict):
         while 'callback' in d:
             d = d['callback']
         d['callback'] = callback
+        return self
 
     def now(self) -> None:
         return self._topic.publish(
@@ -62,23 +71,26 @@ class Thing(UserDict):
     def _table(self):
         return boto3.resource('dynamodb').Table(environ[self._tableName])
 
-    @property
-    def _topic(self):
-        return boto3.resource('sns').Topic(environ['THING_TOPIC'])
-
+    @callable
     def create(self) -> None:
         self._save()
 
+    @callable
     def destroy(self) -> None:
         self._table.delete_item(Key={'uuid': self.uuid})
         logging.debug("{} has been destroyed".format(self.uuid))
 
+    @callable
     def tick(self) -> None:
         " This should be called as a super call at the start of tick "
         self._tid = str(uuid4())  # Each new tick is a new transaction
 
-    def aspect(self, aspect: str):
+    def aspect(self, aspect: str) -> 'Thing':
         return getattr(importlib.import_module(aspect.lower()), aspect)(self.uuid, self.tid)
+
+    @property
+    def aspectName(self) -> str:
+        return self.__class__.__name__
 
     def _load(self, uuid: str) -> None:
         self.data: Dict = self._table.get_item(Key={'uuid': uuid}).get('Item', {})
@@ -96,26 +108,8 @@ class Thing(UserDict):
     def uuid(self) -> str:
         return str(self.data['uuid'])
 
-    def _sendEvent(self, event: EventType) -> str:
-        sendEvent: Dict = {
-            'default': '',
-            'tid': self.tid,
-            'actor_uuid': self.data['uuid']
-        }
-        sendEvent.update(event or {})
-        return self._topic.publish(
-            Message=json.dumps(sendEvent),
-            MessageStructure='json'
-        )
-
     @classmethod
-    def _createCallbackEvent(cls, response: Dict, event: Dict):
-        event = copy.deepcopy(event['callback_data'])
-        event.update(response)
-        return event
-
-    @classmethod
-    def _action(cls, event: EventType):  # This is not state related
+    def _action(cls, event: EventType):  # This is not state related, this is the entry point for the object
         assert(not event['action'].startswith('_'))
         uuid = event['uuid']
         tid = str(event.get('tid') or uuid4())
@@ -128,9 +122,24 @@ class Thing(UserDict):
             Call(c['tid'], '', c['uuid'], c['aspect'], c['action'], **data).now()
         actor._save()
 
+    # Below here are questionable for this class
+
+    def _sendEvent(self, event: EventType) -> str:
+        sendEvent: Dict = {
+            'default': '',
+            'tid': self.tid,
+            'actor_uuid': self.data['uuid']
+        }
+        sendEvent.update(event or {})
+        topic = boto3.resource('sns').Topic(environ['THING_TOPIC'])
+        return topic.publish(
+            Message=json.dumps(sendEvent),
+            MessageStructure='json'
+        )
+
     def call(self, uuid: str, aspect: str, action: str, **kwargs):
         " call('42', 'mobile', 'arrive', destination='68').now() "
-        return Call(self.tid, self.uuid, aspect, action, **kwargs)
+        return Call(self.tid, self.uuid, uuid, aspect, action, **kwargs)
 
     def callAspect(self, aspect: str, action: str, **kwargs):
         return self.call(self.uuid, aspect, action, **kwargs)
