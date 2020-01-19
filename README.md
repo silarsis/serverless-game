@@ -105,7 +105,7 @@ event:
   request_uuid: <uuid of this request>
 ```
 
-Creates a mob in the given location. Presumably there'll be more details in
+Creates a mob in the given location. Presumably there will be more details in
 the create later, once we have more details to give. For now, this is enough.
 
 This will cause the following sequence of events:
