@@ -11,17 +11,15 @@ is sent to the bus:
 ```yaml
 event:
   aspect: location
-  action: leave
-  actor_uuid: <mob uuid>
-  leaving_uuid: <location uuid>
-  direction: north
+  action: move
+  uuid: <mob uuid>
+  data:
+    from_loc: <current location uuid>
+    to_loc: <new location uuid>
 ```
 
-The actor_uuid is used to determine which object is being moved, in this case.
-
 The aspects listen to the bus directly, using filters on the SNS subscribe.
-When a message is received, the entity is loaded from DynamoDB and a check
-is made to see if that entity has that aspect. If it does, then the action
+When a message is received, the entity is loaded from DynamoDB and the action
 is triggered.
 
 Each aspect will have it's own table of data - so all the data and methods for
@@ -32,38 +30,18 @@ This way, aspects can be added and removed easily - add a lambda and SNS
 subscription, and add the aspect to the appropriate objects in DynamoDB
 (or, technically, a aspect could ignore that and just fire anyway).
 
-This also allows for a aspect to fire on an action regardless of the aspect.
-For example, we might implement "look" as an event with an action of "look",
-that every aspect can respond to:
-
-```yaml
-event:
-  aspect: player
-  action: look
-  actor_uuid: <mob uuid>
-```
-
-This is a generic "look around". Theoretically, a whole bunch of aspects could
-respond to this, by filtering for the action and not the aspect. This would
-cause a slew of events in response, which theoretically something would be
-listening for and collating to send back.
-
 ## Interactions
 
-Interactions can be classified in two ways: synchronous vs asychronous,
-and information vs command. I may be slightly loose with those definitions
-because really by "synchronous" I mean "go do that thing and then I'll do my
-thing".
+Interactions can be classified in multiple ways: with or without return value,
+information vs command, and targeted vs. non-targeted.
 
-Async interactions are just events - there is a helper on the base class
-that supports throwing events onto the bus, while also tracking a transaction
-ID and making default values right.  (`_sendEvent`). This applies to both
-information and command events.
+Interactions without return values are just events - there is a helper on the
+base class that supports throwing events onto the bus, while also tracking a
+transaction ID and making default values right (`_sendEvent`). This applies
+to both information and command events, and targeted or not.
 
-Synchronous events - commands or information - are supported via a callback
-mechanism. Again, the `_sendEvent` method is used, but two extra parameters
-are provided, for the name of the callback method and the extra data to carry
-for state.
+Commands or information with a response value are supported via a callback
+mechanism. There is a class (`Call`) that provides this functionality.
 
 So, if you want to change another entity, you throw an event that triggers
 an action on that entity. If you have changed your own state, you throw
@@ -74,23 +52,6 @@ method to go to once that data is there.
 
 How do we do aggregates? I think it'll probably require aggregation objects,
 but let's chase that through and see as we build it.
-
-Interactions between entities should take one of three forms:
-
-* Command event thrown - entity A throws an event that should result in
-  some change of state of the entity.
-* Information event thrown - entity A throws an event that other entities
-  may observe, but probably don't act on.
-* Synchronous - entity A calls another lambda directly to trigger an action
-  and get a response.
-
-Command and Information are perilously close, as an information event can
-trigger a command event easily. Synchronous vs. non-synchronous may or may not
-be important - the use case I'm thinking of is a "create, then place" sequence,
-where something needs to create an entity, get the uuid for the newly created
-entity, then place that entity somewhere. Alternately, we could send an event
-to create that carries extra information for the subsequent event - kind of an
-event-based webhook.
 
 ## Example Event Streams
 

@@ -69,9 +69,10 @@ class Location(Thing):
         self.add_location(to_loc)
         self.remove_location(from_loc)
 
-    def create(self):
+    def create(self) -> Dict[str, str]:
         self.data['exits'] = {}
         super().create()
+        return {'uuid': self.uuid}
 
     def destroy(self):
         for uuid in self.contents:
