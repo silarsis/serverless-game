@@ -49,16 +49,22 @@ class Thing(UserDict):
     def __init__(self, uuid: str = None, tid: str = None):
         super().__init__()
         assert(self._tableName)
-        self._table = boto3.resource('dynamodb').Table(environ[self._tableName])
-        self._topic = boto3.resource('sns').Topic(environ['THING_TOPIC'])
         self._tid: str = tid or str(uuid4())
-        self.uuid = uuid or str(uuid4())
+        self.data['uuid'] = uuid or str(uuid4())
         if uuid:
             self._load(uuid)
         else:
             self.create()
         assert(self.data)
         assert(self.uuid)
+
+    @property
+    def _table(self):
+        return boto3.resource('dynamodb').Table(environ[self._tableName])
+
+    @property
+    def _topic(self):
+        return boto3.resource('sns').Topic(environ['THING_TOPIC'])
 
     def create(self) -> None:
         self._save()
@@ -69,13 +75,15 @@ class Thing(UserDict):
 
     def tick(self) -> None:
         " This should be called as a super call at the start of tick "
-        self.tid = str(uuid4())  # Each new tick is a new transaction
+        self._tid = str(uuid4())  # Each new tick is a new transaction
 
     def aspect(self, aspect: str):
         return getattr(importlib.import_module(aspect.lower()), aspect)(self.uuid, self.tid)
 
     def _load(self, uuid: str) -> None:
         self.data: Dict = self._table.get_item(Key={'uuid': uuid}).get('Item', {})
+        if not self.data:
+            raise KeyError("load for non-existent item {}".format(uuid))
 
     def _save(self) -> None:
         self._table.put_item(Item=self.data)
@@ -84,17 +92,9 @@ class Thing(UserDict):
     def tid(self) -> str:
         return self._tid
 
-    @tid.setter
-    def tid(self, value: str) -> None:
-        self._tid = value
-
     @property
     def uuid(self) -> str:
         return str(self.data['uuid'])
-
-    @uuid.setter
-    def uuid(self, value: str) -> None:
-        self.data['uuid'] = value
 
     def _sendEvent(self, event: EventType) -> str:
         sendEvent: Dict = {

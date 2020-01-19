@@ -7,7 +7,7 @@ class LandCreator(thing):
     " This entity creates new exits and moves "
     def create(self):
         # Land creators are mobs, so they're location aware
-        self.createAspect('location')
+        self.createAspect('Location')
         super().create()
 
     def tick(self):
