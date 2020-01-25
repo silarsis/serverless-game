@@ -126,8 +126,7 @@ resources:
                     "Resource": "arn:aws:states:::sns:publish",
                     "Parameters": {
                       "TopicArn": "arn:aws:sns:${opt:region, self:custom.defaultRegion}::${self:custom.thingTopic}",
-                      "Subject.$": "$.subject",
-                      "Message.$": "$.message"
+                      "Message.$": "$.data"
                     },
                     "End": true
                   }

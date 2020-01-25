@@ -44,10 +44,13 @@ class Call(UserDict):
         )
 
     def after(self, seconds: int = 0) -> None:
-        return self._topic.publish(
-            Message=json.dumps(self.data),
-            MessageStructure='json'
-            # TODO: Add the step function delayer and use that
+        self.data['delay_seconds'] = seconds
+        return boto3.client('stepfunctions').start_execution(
+            stateMachineArn=environ['MESSAGE_DELAYER_ARN'],
+            input={
+                'delay_seconds': seconds,
+                'data': self.data
+            }
         )
 
 
