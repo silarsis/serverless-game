@@ -50,48 +50,43 @@ functions:
       include:
         - aspects/**
     events:
-      - sns:
-          arn: "arn:aws:sns:${opt:region, self:custom.defaultRegion}::${self:custom.thingTopic}"
-          topicName: "${self:custom.thingTopic}"
-          filterPolicy:
-            aspect:
-              - thing
+      - sns: ThingTopic
 
-  location:
-    handler: aspects/location.handler
-    VpcId:
-      Ref:
-        Fn::ImportValue: VpcId
-    package:
-      exclude:
-        - ./**
-      include:
-        - aspects/**
-    events:
-      - sns:
-          arn: "arn:aws:sns:${opt:region, self:custom.defaultRegion}::${self:custom.thingTopic}"
-          topicName: ${self:custom.thingTopic}
-          filterPolicy:
-            aspect:
-              - location
+  # location:
+  #   handler: aspects/location.handler
+  #   VpcId:
+  #     Ref:
+  #       Fn::ImportValue: VpcId
+  #   package:
+  #     exclude:
+  #       - ./**
+  #     include:
+  #       - aspects/**
+  #   events:
+  #     - sns:
+  #         arn: "arn:aws:sns:${opt:region, self:custom.defaultRegion}::${self:custom.thingTopic}"
+  #         topicName: ${self:custom.thingTopic}
+  #         filterPolicy:
+  #           aspect:
+  #             - location
 
-    landCreator:
-      handler: aspects/landCreator.handler
-      VpcId:
-        Ref:
-          Fn::ImportValue: VpcId
-      package:
-        exclude:
-          - ./**
-        include:
-          - aspects/**
-      events:
-        - sns:
-            arn: "arn:aws:sns:${opt:region, self:custom.defaultRegion}::${self:custom.thingTopic}"
-            topicName: ${self:custom.thingTopic}
-            filterPolicy:
-              aspect:
-                - landCreator
+  #   landCreator:
+  #     handler: aspects/landCreator.handler
+  #     VpcId:
+  #       Ref:
+  #         Fn::ImportValue: VpcId
+  #     package:
+  #       exclude:
+  #         - ./**
+  #       include:
+  #         - aspects/**
+  #     events:
+  #       - sns:
+  #           arn: "arn:aws:sns:${opt:region, self:custom.defaultRegion}::${self:custom.thingTopic}"
+  #           topicName: ${self:custom.thingTopic}
+  #           filterPolicy:
+  #             aspect:
+  #               - landCreator
 resources:
   Resources:
     ThingTopic:
