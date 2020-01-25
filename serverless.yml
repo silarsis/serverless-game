@@ -130,29 +130,27 @@ resources:
         StateMachineName: ${self:custom.MessageDelayerName}
         RoleArn: !GetAtt StepFunctionsServiceRole.Arn
         # Replace "SecondsPath" with "TimestampPath" for scheduling
-        DefinitionString:
-          Fn::Sub:
-            - |
-              {
-                "StartAt": "Delay",
-                "Comment": "Publish to SNS with delay",
-                "States": {
-                  "Delay": {
-                    "Type": "Wait",
-                    "SecondsPath": "$.delay_seconds",
-                    "Next": "Publish to SNS"
-                  },
-                  "Publish to SNS": {
-                    "Type": "Task",
-                    "Resource": "arn:aws:states:::sns:publish",
-                    "Parameters": {
-                      "TopicArn": "arn:aws:sns:#{AWS::Region}:#{AWS::AccountId}:${self:custom.topics.thingName}",
-                      "Message.$": "$.data"
-                    },
-                    "End": true
-                  }
-                }
+        DefinitionString: |
+          {
+            "StartAt": "Delay",
+            "Comment": "Publish to SNS with delay",
+            "States": {
+              "Delay": {
+                "Type": "Wait",
+                "SecondsPath": "$.delay_seconds",
+                "Next": "Publish to SNS"
+              },
+              "Publish to SNS": {
+                "Type": "Task",
+                "Resource": "arn:aws:states:::sns:publish",
+                "Parameters": {
+                  "TopicArn": "arn:aws:sns:#{AWS::Region}:#{AWS::AccountId}:${self:custom.topics.thingName}",
+                  "Message.$": "$.data"
+                },
+                "End": true
               }
+            }
+          }
 
     ThingDynamoDBTable:
       Type: 'AWS::DynamoDB::Table'
