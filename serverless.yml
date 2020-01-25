@@ -3,14 +3,18 @@ service: serverless-game
 app: serverless-game
 org: silarsis
 
+plugins:
+  - serverless-pseudo-parameters
 
 custom:
   defaultRegion: ap-southeast-1
-  thingTableName: 'thing-table-${self:provider.stage}'
-  locationTableName: 'location-table-${self:provider.stage}'
-  contentsTableName: 'contents-table-${self:provider.stage}'
-  locationsTableName: 'locations-table-${self:provider.stage}'
-  thingTopic: 'thing-topic-${self:provider.stage}'
+  tables:
+    thingName: 'thing-table-${self:provider.stage}'
+    locationName: 'location-table-${self:provider.stage}'
+    contentsName: 'contents-table-${self:provider.stage}'
+    locationsName: 'locations-table-${self:provider.stage}'
+  topics:
+    thingName: 'thing-topic-${self:provider.stage}'
   MessageDelayerName: 'message-delayer-${self:provider.stage}'
 
 provider:
@@ -31,10 +35,10 @@ provider:
         - { "Fn::GetAtt": ["LocationDynamoDBTable", "Arn" ] }
         - { "Fn::GetAtt": ["ContentsDynamoDBTable", "Arn" ] }
   environment:
-    THING_TABLE: ${self:custom.thingTableName}
-    LOCATION_TABLE: ${self:custom.locationTableName}
-    CONTENTS_TABLE: ${self:custom.contentsTableName}
-    LOCATIONS_TABLE: ${self:custom.locationsTableName}
+    THING_TABLE: ${self:custom.tables.thingName}
+    LOCATION_TABLE: ${self:custom.tables.locationName}
+    CONTENTS_TABLE: ${self:custom.tables.contentsName}
+    LOCATIONS_TABLE: ${self:custom.tables.locationsName}
     THING_TOPIC_ARN: !Ref ThingTopic
     MESSAGE_DELAYER_ARN: !GetAtt ["MessageDelayer", "Arn"]
 
@@ -50,7 +54,8 @@ functions:
       include:
         - aspects/**
     events:
-      - sns: ThingTopic
+      - sns:
+          arn: "arn:aws:sns:#{AWS::Region}:#{AWS::AccountId}:${self:custom.topics.thingName}"
 
   # location:
   #   handler: aspects/location.handler
@@ -92,11 +97,11 @@ resources:
     ThingTopic:
       Type: AWS::SNS::Topic
       Properties:
-        TopicName: ${self:custom.thingTopic}
+        TopicName: ${self:custom.topics.thingName}
     StepFunctionsServiceRole:
       Type: "AWS::IAM::Role"
       Properties:
-        Path: !Join ["", ["/", !Ref "AWS::StackName", "/"]]
+        Path: "/#{AWS::StackName}/"
         ManagedPolicyArns:
           - "arn:aws:iam::aws:policy/AWSStepFunctionsFullAccess"
         AssumeRolePolicyDocument:
@@ -108,7 +113,7 @@ resources:
               Action:
                 - "sts:AssumeRole"
               Principal:
-                Service: "states.${opt:region, self:custom.defaultRegion}.amazonaws.com"
+                Service: "states.#{AWS::Region}.amazonaws.com"
         Policies:
           - PolicyName: "PublishToSNSTopic"
             PolicyDocument:
@@ -141,7 +146,7 @@ resources:
                     "Type": "Task",
                     "Resource": "arn:aws:states:::sns:publish",
                     "Parameters": {
-                      "TopicArn": "arn:aws:sns:${opt:region, self:custom.defaultRegion}::${self:custom.thingTopic}",
+                      "TopicArn": "arn:aws:sns:#{AWS::Region}:#{AWS::AccountId}:${self:custom.topics.thingName}",
                       "Message.$": "$.data"
                     },
                     "End": true
@@ -164,7 +169,7 @@ resources:
         ProvisionedThroughput:
           ReadCapacityUnits: 1
           WriteCapacityUnits: 1
-        TableName: ${self:custom.thingTableName}
+        TableName: ${self:custom.tables.thingName}
     LocationDynamoDBTable:
       Type: 'AWS::DynamoDB::Table'
       Properties:
@@ -179,7 +184,7 @@ resources:
         ProvisionedThroughput:
           ReadCapacityUnits: 1
           WriteCapacityUnits: 1
-        TableName: ${self:custom.locationTableName}
+        TableName: ${self:custom.tables.locationName}
     ContentsDynamoDBTable:
       Type: 'AWS::DynamoDB::Table'
       Properties:
@@ -200,4 +205,4 @@ resources:
         ProvisionedThroughput:
           ReadCapacityUnits: 1
           WriteCapacityUnits: 1
-        TableName: ${self:custom.contentsTableName}
+        TableName: ${self:custom.tables.contentsName}
