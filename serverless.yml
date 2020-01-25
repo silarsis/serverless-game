@@ -51,8 +51,8 @@ functions:
         - aspects/**
     events:
       - sns:
-          arn: !Ref ThingTopic
-          topicName: ${self:custom.thingTopic}
+          arn: "arn:aws:sns:${opt:region, self:custom.defaultRegion}::${self:custom.thingTopic}"
+          topicName: "${self:custom.thingTopic}"
           filterPolicy:
             aspect:
               - thing
@@ -69,7 +69,7 @@ functions:
         - aspects/**
     events:
       - sns:
-          arn: !Ref ThingTopic
+          arn: "arn:aws:sns:${opt:region, self:custom.defaultRegion}::${self:custom.thingTopic}"
           topicName: ${self:custom.thingTopic}
           filterPolicy:
             aspect:
@@ -87,7 +87,7 @@ functions:
           - aspects/**
       events:
         - sns:
-            arn: !Ref ThingTopic
+            arn: "arn:aws:sns:${opt:region, self:custom.defaultRegion}::${self:custom.thingTopic}"
             topicName: ${self:custom.thingTopic}
             filterPolicy:
               aspect:
