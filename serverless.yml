@@ -35,7 +35,7 @@ provider:
     LOCATION_TABLE: ${self:custom.locationTableName}
     CONTENTS_TABLE: ${self:custom.contentsTableName}
     LOCATIONS_TABLE: ${self:custom.locationsTableName}
-    THING_TOPIC_ARN: !GetAtt ["ThingTopic", "Arn"]
+    THING_TOPIC_ARN: !Ref ThingTopic
     MESSAGE_DELAYER_ARN: !GetAtt ["MessageDelayer", "Arn"]
 
 functions:
@@ -52,7 +52,7 @@ functions:
     events:
       - sns:
           arn: !Ref ThingTopic
-          topicName: ThingTopic
+          topicName: ${self:custom.thingTopic}
   location:
     handler: aspects/location.handler
     VpcId:
@@ -66,7 +66,7 @@ functions:
     events:
       - sns:
           arn: !Ref ThingTopic
-          topicName: ThingTopic
+          topicName: ${self:custom.thingTopic}
           filterPolicy:
             aspect:
               - location
