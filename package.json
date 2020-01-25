@@ -22,5 +22,8 @@
   "dependencies": {
     "serverless": "^1.61.3",
     "serverless-pseudo-parameters": "^2.5.0"
+  },
+  "devDependencies": {
+    "serverless-python-requirements": "^5.0.1"
   }
 }

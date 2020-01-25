@@ -5,7 +5,7 @@ org: silarsis
 
 plugins:
   - serverless-pseudo-parameters
-
+  - serverless-python-requirements
 custom:
   defaultRegion: ap-southeast-1
   tables:
