@@ -14,7 +14,6 @@ IdType = str  # This is a UUID cast to a str, but I want to identify it for typi
 class Call(UserDict):
     def __init__(self, tid: str, originator: IdType, uuid: IdType, aspect: str, action: str, **kwargs):
         super().__init__()
-        self._topic = boto3.resource('sns').Topic(environ['THING_TOPIC_ARN'])
         self._originating_uuid = originator
         self.data['tid'] = tid
         self.data['aspect'] = aspect
@@ -38,19 +37,21 @@ class Call(UserDict):
         return self
 
     def now(self) -> None:
-        return self._topic.publish(
+        sns = boto3.resource('sns').Topic(environ['THING_TOPIC_ARN'])
+        return sns.publish(
             Message=json.dumps(self.data),
             MessageStructure='json'
         )
 
     def after(self, seconds: int = 0) -> None:
         self.data['delay_seconds'] = seconds
-        return boto3.client('stepfunctions').start_execution(
+        sfn = boto3.client('stepfunctions')
+        return sfn.start_execution(
             stateMachineArn=environ['MESSAGE_DELAYER_ARN'],
-            input={
+            input=json.dumps({
                 'delay_seconds': seconds,
                 'data': self.data
-            }
+            })
         )
 
 
