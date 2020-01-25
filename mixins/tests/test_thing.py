@@ -65,12 +65,12 @@ class TestThing(unittest.TestCase):
 
     @mock_dynamodb2
     @mock_sns
-    # TODO: Setup SNS, check that it's used properly
     def test_tick(self):
         self._createTestTable()
         self._createTestSNS()
         t = ThingTestClass('', 'tid')
         t.tick()
+        # TODO: Check that it self-scheduled
 
     @mock_dynamodb2
     def test_prohibited_sets(self):
