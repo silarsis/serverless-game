@@ -22,6 +22,7 @@ var/
 
 # Serverless directories
 .serverless
+serverless_sdk/
 
 # Visual Studio Code
 .vscode/
