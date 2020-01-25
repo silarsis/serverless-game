@@ -18,5 +18,8 @@
   "bugs": {
     "url": "https://github.com/silarsis/serverless-game/issues"
   },
-  "homepage": "https://github.com/silarsis/serverless-game#readme"
+  "homepage": "https://github.com/silarsis/serverless-game#readme",
+  "dependencies": {
+    "serverless": "^1.61.3"
+  }
 }

@@ -92,9 +92,7 @@ resources:
               Action:
                 - "sts:AssumeRole"
               Principal:
-                Service:
-                  - !Sub
-                    !Join ["", ["states.", !Ref "AWS::Region", ".amazonaws.com"]]
+                Service: "states.${opt:region, self:custom.defaultRegion}.amazonaws.com"
         Policies:
           - PolicyName: "PublishToSNSTopic"
             PolicyDocument:
@@ -127,7 +125,7 @@ resources:
                     "Type": "Task",
                     "Resource": "arn:aws:states:::sns:publish",
                     "Parameters": {
-                      "TopicArn": "${ThingTopic}",
+                      "TopicArn": "arn:aws:sns:${opt:region, self:custom.defaultRegion}::${self:custom.thingTopic}",
                       "Subject.$": "$.subject",
                       "Message.$": "$.message"
                     },

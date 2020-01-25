@@ -26,3 +26,4 @@ var/
 # Visual Studio Code
 .vscode/
 .history/
+node_modules
