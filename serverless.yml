@@ -56,6 +56,9 @@ functions:
     events:
       - sns:
           arn: "arn:aws:sns:#{AWS::Region}:#{AWS::AccountId}:${self:custom.topics.thingName}"
+          filterPolicy:
+            aspect:
+              - thing
 
   location:
     handler: aspects/location.handler
