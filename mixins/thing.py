@@ -67,6 +67,12 @@ class Thing(UserDict):
         assert(self.uuid)
 
     @property
+    def tickDelay(self):
+        if 'tick_delay' in self.data:
+            return self.data['tick_delay']
+        return 30
+
+    @property
     def _table(self):
         return boto3.resource('dynamodb').Table(environ[self._tableName])
 
@@ -78,8 +84,10 @@ class Thing(UserDict):
         logging.debug("{} has been destroyed".format(self.uuid))
 
     def tick(self) -> None:
-        " This should be called as a super call at the start of tick "
-        self._tid = str(uuid4())  # Each new tick is a new transaction
+        self.schedule_next_tick()
+
+    def schedule_next_tick(self) -> None:
+        Call(str(uuid4()), self.uuid, self.uuid, self.aspectName, 'tick').after(seconds=self.tickDelay)
 
     def aspect(self, aspect: str) -> 'Thing':
         return getattr(importlib.import_module(aspect.lower()), aspect)(self.uuid, self.tid)

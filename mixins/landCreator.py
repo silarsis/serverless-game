@@ -31,6 +31,7 @@ class LandCreator(thing):
                 new_loc = Location()
                 new_loc.add_exit(directions[exit], loc.uuid)
                 loc.add_exit(exit, new_loc.uuid)
+        self.schedule_next_tick()
 
 
 handler = lambdaHandler(LandCreator)
