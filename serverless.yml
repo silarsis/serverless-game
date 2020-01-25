@@ -147,7 +147,13 @@ resources:
                 "Resource": "arn:aws:states:::sns:publish",
                 "Parameters": {
                   "TopicArn": "arn:aws:sns:#{AWS::Region}:#{AWS::AccountId}:${self:custom.topics.thingName}",
-                  "Message.$": "$.data"
+                  "Message.$": "$.data",
+                  "MessageAttributes": {
+                    "aspect": {
+                      "DataType": "String",
+                      "StringValue": "$.data.aspect"
+                    }
+                  }
                 },
                 "End": true
               }

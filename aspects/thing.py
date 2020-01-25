@@ -40,7 +40,13 @@ class Call(UserDict):
         sns = boto3.resource('sns').Topic(environ['THING_TOPIC_ARN'])
         return sns.publish(
             Message=json.dumps(self.data),
-            MessageStructure='json'
+            MessageStructure='json',
+            MessageAttributes={
+                'aspect': {
+                    'DataType': 'String',
+                    'StringValue': self.data['aspect']
+                }
+            }
         )
 
     def after(self, seconds: int = 0) -> None:
