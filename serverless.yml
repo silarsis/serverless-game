@@ -58,7 +58,7 @@ functions:
           arn: "arn:aws:sns:#{AWS::Region}:#{AWS::AccountId}:${self:custom.topics.thingName}"
           filterPolicy:
             aspect:
-              - thing
+              - Thing
 
   location:
     handler: aspects/location.handler
@@ -75,7 +75,7 @@ functions:
           arn: "arn:aws:sns:#{AWS::Region}:#{AWS::AccountId}:${self:custom.topics.thingName}"
           filterPolicy:
             aspect:
-              - location
+              - Location
 
     landCreator:
       handler: aspects/landCreator.handler
@@ -92,7 +92,7 @@ functions:
             arn: "arn:aws:sns:#{AWS::Region}:#{AWS::AccountId}:${self:custom.topics.thingName}"
             filterPolicy:
               aspect:
-                - landCreator
+                - LandCreator
 
 resources:
   Resources:
