@@ -53,6 +53,10 @@ functions:
       - sns:
           arn: !Ref ThingTopic
           topicName: ${self:custom.thingTopic}
+          filterPolicy:
+            aspect:
+              - thing
+
   location:
     handler: aspects/location.handler
     VpcId:
@@ -71,6 +75,23 @@ functions:
             aspect:
               - location
 
+    landCreator:
+      handler: aspects/landCreator.handler
+      VpcId:
+        Ref:
+          Fn::ImportValue: VpcId
+      package:
+        exclude:
+          - ./**
+        include:
+          - aspects/**
+      events:
+        - sns:
+            arn: !Ref ThingTopic
+            topicName: ${self:custom.thingTopic}
+            filterPolicy:
+              aspect:
+                - landCreator
 resources:
   Resources:
     ThingTopic:
