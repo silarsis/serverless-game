@@ -1,7 +1,7 @@
 import unittest
 from moto import mock_dynamodb2, mock_sns, mock_stepfunctions
 import boto3
-from mixins import thing
+from aspects import thing
 from os import environ
 
 
