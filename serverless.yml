@@ -35,7 +35,7 @@ provider:
     LOCATION_TABLE: ${self:custom.locationTableName}
     CONTENTS_TABLE: ${self:custom.contentsTableName}
     LOCATIONS_TABLE: ${self:custom.locationsTableName}
-    THING_TOPIC: ${self:custom.thingTopic}
+    THING_TOPIC_ARN: !GetAttr ["ThingTopic", "Arn"]
     MESSAGE_DELAYER_ARN: !GetAttr ["MessageDelayer", "Arn"]
 
 functions:

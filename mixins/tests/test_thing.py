@@ -10,13 +10,12 @@ class ThingTestClass(thing.Thing):
 
 
 environ['testing'] = 'test_table'
-environ['THING_TOPIC'] = 'thing_topic'
 
 
 class TestThing(unittest.TestCase):
     def _createTestTable(self):
         boto3.resource('dynamodb').create_table(
-            TableName='test_table',
+            TableName=environ['testing'],
             KeySchema=[
                 {'AttributeName': 'uuid', 'KeyType': 'HASH'}
             ],
@@ -24,6 +23,9 @@ class TestThing(unittest.TestCase):
                 {'AttributeName': 'uuid', 'AttributeType': 'S'}
             ]
         )
+
+    def _createTestSNS(self):
+        environ['THING_TOPIC_ARN'] = boto3.resource('sns').create_topic(Name='ThingTopic').arn
 
     def test_fail_no_tablename(self):
         with self.assertRaises(AssertionError):
@@ -61,14 +63,14 @@ class TestThing(unittest.TestCase):
         with self.assertRaises(KeyError):
             t = ThingTestClass(uuid, 'tid2')
 
-    # @mock_dynamodb2
-    # @mock_sns
-    # # TODO: Setup SNS, check that it's used properly
-    # def test_tick(self):
-    #     self._createTestTable()
-    #     t = ThingTestClass('', 'tid')
-    #     t.tick()
-    #     self.assertNotEqual(t.tid, 'tid')
+    @mock_dynamodb2
+    @mock_sns
+    # TODO: Setup SNS, check that it's used properly
+    def test_tick(self):
+        self._createTestTable()
+        self._createTestSNS()
+        t = ThingTestClass('', 'tid')
+        t.tick()
 
     @mock_dynamodb2
     def test_prohibited_sets(self):

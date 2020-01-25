@@ -13,13 +13,14 @@ IdType = str  # This is a UUID cast to a str, but I want to identify it for typi
 
 class Call(UserDict):
     def __init__(self, tid: str, originator: IdType, uuid: IdType, aspect: str, action: str, **kwargs):
-        self._topic = boto3.resource('sns').Topic(environ['THING_TOPIC'])
+        super().__init__()
+        self._topic = boto3.resource('sns').Topic(environ['THING_TOPIC_ARN'])
         self._originating_uuid = originator
-        self._data['tid'] = tid
-        self._data['aspect'] = aspect
-        self._data['uuid'] = uuid
-        self._data['action'] = action
-        self._data['data'] = kwargs
+        self.data['tid'] = tid
+        self.data['aspect'] = aspect
+        self.data['uuid'] = uuid
+        self.data['action'] = action
+        self.data['data'] = kwargs
 
     def thenCall(self, aspect: str, action: str, uuid: IdType, **kwargs: Dict) -> 'Call':
         assert(self._originating_uuid)
@@ -30,7 +31,7 @@ class Call(UserDict):
             'uuid': self._originating_uuid,
             'data': kwargs
         }
-        d = self._data
+        d = self.data
         while 'callback' in d:
             d = d['callback']
         d['callback'] = callback
@@ -38,13 +39,13 @@ class Call(UserDict):
 
     def now(self) -> None:
         return self._topic.publish(
-            Message=json.dumps(self._data),
+            Message=json.dumps(self.data),
             MessageStructure='json'
         )
 
     def after(self, seconds: int = 0) -> None:
         return self._topic.publish(
-            Message=json.dumps(self._data),
+            Message=json.dumps(self.data),
             MessageStructure='json'
             # TODO: Add the step function delayer and use that
         )
@@ -135,7 +136,7 @@ class Thing(UserDict):
             'actor_uuid': self.data['uuid']
         }
         sendEvent.update(event or {})
-        topic = boto3.resource('sns').Topic(environ['THING_TOPIC'])
+        topic = boto3.resource('sns').Topic(environ['THING_TOPIC_ARN'])
         return topic.publish(
             Message=json.dumps(sendEvent),
             MessageStructure='json'
