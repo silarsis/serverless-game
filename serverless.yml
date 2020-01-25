@@ -57,41 +57,40 @@ functions:
       - sns:
           arn: "arn:aws:sns:#{AWS::Region}:#{AWS::AccountId}:${self:custom.topics.thingName}"
 
-  # location:
-  #   handler: aspects/location.handler
-  #   VpcId:
-  #     Ref:
-  #       Fn::ImportValue: VpcId
-  #   package:
-  #     exclude:
-  #       - ./**
-  #     include:
-  #       - aspects/**
-  #   events:
-  #     - sns:
-  #         arn: "arn:aws:sns:${opt:region, self:custom.defaultRegion}::${self:custom.thingTopic}"
-  #         topicName: ${self:custom.thingTopic}
-  #         filterPolicy:
-  #           aspect:
-  #             - location
+  location:
+    handler: aspects/location.handler
+    VpcId:
+      Ref:
+        Fn::ImportValue: VpcId
+    package:
+      exclude:
+        - ./**
+      include:
+        - aspects/**
+    events:
+      - sns:
+          arn: "arn:aws:sns:#{AWS::Region}:#{AWS::AccountId}:${self:custom.topics.thingName}"
+          filterPolicy:
+            aspect:
+              - location
 
-  #   landCreator:
-  #     handler: aspects/landCreator.handler
-  #     VpcId:
-  #       Ref:
-  #         Fn::ImportValue: VpcId
-  #     package:
-  #       exclude:
-  #         - ./**
-  #       include:
-  #         - aspects/**
-  #     events:
-  #       - sns:
-  #           arn: "arn:aws:sns:${opt:region, self:custom.defaultRegion}::${self:custom.thingTopic}"
-  #           topicName: ${self:custom.thingTopic}
-  #           filterPolicy:
-  #             aspect:
-  #               - landCreator
+    landCreator:
+      handler: aspects/landCreator.handler
+      VpcId:
+        Ref:
+          Fn::ImportValue: VpcId
+      package:
+        exclude:
+          - ./**
+        include:
+          - aspects/**
+      events:
+        - sns:
+            arn: "arn:aws:sns:#{AWS::Region}:#{AWS::AccountId}:${self:custom.topics.thingName}"
+            filterPolicy:
+              aspect:
+                - landCreator
+
 resources:
   Resources:
     ThingTopic:
