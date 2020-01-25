@@ -1,5 +1,6 @@
 import thing
 from handler import lambdaHandler
+from location import Location
 import random
 
 
@@ -23,19 +24,13 @@ class LandCreator(thing):
             # Randomly pick a direction - n, s, e, w
             exit = random.choice(directions)
             # If that exit already exists, take it
-            if exit in loc.exits:  # loc.exits is wrong, need to callback here
+            if exit in loc.exits:
                 my.move(loc.uuid, loc.exits[exit])
             # Otherwise, create a new exit with no land
             else:
-                # create isn't a good call, init with no uuid already creates
-                self.call(
-                    '',
-                    'Location',
-                    'add_exit',
-                    direction=directions[exit],
-                    destination=loc
-                ).thenCall(loc.uuid, 'Location', 'add_exit', )
-                loc.add_exit(exit, '')
+                new_loc = Location()
+                new_loc.add_exit(directions[exit], loc.uuid)
+                loc.add_exit(exit, new_loc.uuid)
 
 
 handler = lambdaHandler(LandCreator)

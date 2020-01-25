@@ -8,19 +8,11 @@ import logging
 import importlib
 
 EventType = Dict[str, Any]  # Actually needs to be json-able
-
-
-def callable(func):
-    # TODO: Can this be made to keep a register for use by lambdaHandler?
-    def wrapper(*args, **kwargs):
-        result: dict = func(*args, **kwargs)
-        assert(isinstance(result, dict) or result is None)
-        return result
-    return wrapper
+IdType = str  # This is a UUID cast to a str, but I want to identify it for typing purposes
 
 
 class Call(UserDict):
-    def __init__(self, tid: str, originator: str, uuid: str, aspect: str, action: str, **kwargs):
+    def __init__(self, tid: str, originator: IdType, uuid: IdType, aspect: str, action: str, **kwargs):
         self._topic = boto3.resource('sns').Topic(environ['THING_TOPIC'])
         self._originating_uuid = originator
         self.data['tid'] = tid
@@ -29,7 +21,7 @@ class Call(UserDict):
         self.data['action'] = action
         self.data['data'] = kwargs
 
-    def thenCall(self, aspect: str, action: str, uuid: str, **kwargs: Dict) -> 'Call':
+    def thenCall(self, aspect: str, action: str, uuid: IdType, **kwargs: Dict) -> 'Call':
         assert(self._originating_uuid)
         callback = {
             'tid': self['tid'],
@@ -50,12 +42,19 @@ class Call(UserDict):
             MessageStructure='json'
         )
 
+    def after(self, seconds: int = 0) -> None:
+        return self._topic.publish(
+            Message=json.dumps(self.data),
+            MessageStructure='json'
+            # TODO: Add the step function delayer and use that
+        )
+
 
 class Thing(UserDict):
     " Thing objects have state (stored in dynamo) and know how to event and callback "
     _tableName: str = ''  # Set this in the subclass
 
-    def __init__(self, uuid: str = None, tid: str = None):
+    def __init__(self, uuid: IdType = None, tid: str = None):
         super().__init__()
         assert(self._tableName)
         self._tid: str = tid or str(uuid4())
@@ -71,16 +70,13 @@ class Thing(UserDict):
     def _table(self):
         return boto3.resource('dynamodb').Table(environ[self._tableName])
 
-    @callable
     def create(self) -> None:
         self._save()
 
-    @callable
     def destroy(self) -> None:
         self._table.delete_item(Key={'uuid': self.uuid})
         logging.debug("{} has been destroyed".format(self.uuid))
 
-    @callable
     def tick(self) -> None:
         " This should be called as a super call at the start of tick "
         self._tid = str(uuid4())  # Each new tick is a new transaction
@@ -92,7 +88,7 @@ class Thing(UserDict):
     def aspectName(self) -> str:
         return self.__class__.__name__
 
-    def _load(self, uuid: str) -> None:
+    def _load(self, uuid: IdType) -> None:
         self.data: Dict = self._table.get_item(Key={'uuid': uuid}).get('Item', {})
         if not self.data:
             raise KeyError("load for non-existent item {}".format(uuid))
@@ -105,7 +101,7 @@ class Thing(UserDict):
         return self._tid
 
     @property
-    def uuid(self) -> str:
+    def uuid(self) -> IdType:
         return str(self.data['uuid'])
 
     @classmethod
@@ -137,8 +133,8 @@ class Thing(UserDict):
             MessageStructure='json'
         )
 
-    def call(self, uuid: str, aspect: str, action: str, **kwargs):
-        " call('42', 'mobile', 'arrive', destination='68').now() "
+    def call(self, uuid: IdType, aspect: str, action: str, **kwargs):
+        " call('42', 'mobile', 'arrive', kwargs={'destination': '68'}).now() "
         return Call(self.tid, self.uuid, uuid, aspect, action, **kwargs)
 
     def callAspect(self, aspect: str, action: str, **kwargs):
