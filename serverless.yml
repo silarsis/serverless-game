@@ -40,7 +40,7 @@ provider:
     CONTENTS_TABLE: ${self:custom.tables.contentsName}
     LOCATIONS_TABLE: ${self:custom.tables.locationsName}
     THING_TOPIC_ARN: !Ref ThingTopic
-    MESSAGE_DELAYER_ARN: !GetAtt ["MessageDelayer", "Arn"]
+    MESSAGE_DELAYER_ARN: !Ref MessageDelayer
 
 functions:
   thing:
