@@ -1,8 +1,8 @@
-from .thing import Thing, IdType
+from aspects.thing import Thing, IdType
 import boto3
 from boto3.dynamodb.conditions import Key
 import logging
-from .handler import lambdaHandler
+from aspects.handler import lambdaHandler
 from typing import List, Dict
 
 
