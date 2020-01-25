@@ -11,6 +11,7 @@ custom:
   contentsTableName: 'contents-table-${self:provider.stage}'
   LocationsTableName: 'locations-table-${self:provider.stage}'
   thingTopic: 'thing-topic-${self:provider.stage}'
+  MessageDelayerName: 'message-delayer-${self:provider.stage}'
 
 provider:
   name: aws
@@ -35,6 +36,7 @@ provider:
     CONTENTS_TABLE: ${self:custom.contentsTableName}
     LOCATIONS_TABLE: ${self:custom.locationsTableName}
     THING_TOPIC: ${self:custom.thingTopic}
+    MESSAGE_DELAYER: ${self:custom.MessageDelayerName}
 
 functions:
   thing:
@@ -75,6 +77,65 @@ resources:
       Type: AWS::SNS::Topic
       Properties:
         TopicName: ${self:custom.thingTopic}
+    StepFunctionsServiceRole:
+      Type: "AWS::IAM::Role"
+      Properties:
+        Path: !Join ["", ["/", !Ref "AWS::StackName", "/"]]
+        ManagedPolicyArns:
+          - "arn:aws:iam::aws:policy/AWSStepFunctionsFullAccess"
+        AssumeRolePolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            -
+              Sid: "AllowStepFunctionsServiceToAssumeRole"
+              Effect: "Allow"
+              Action:
+                - "sts:AssumeRole"
+              Principal:
+                Service:
+                  - !Sub "states.${AWS::Region}.amazonaws.com"
+        Policies:
+          - PolicyName: "PublishToSNSTopic"
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: "Allow"
+                  Action:
+                    - "sns:Publish"
+                  Resource:
+                    - !Ref ThingTopic
+    MessageDelayer:
+      Type: "AWS::StepFunctions::StateMachine"
+      Properties:
+        StateMachineName: ${self:custom.MessageDelayerName}
+        RoleArn: !GetAtt StepFunctionsServiceRole.Arn
+        # Replace "SecondsPath" with "TimestampPath" for scheduling
+        DefinitionString:
+          Fn::Sub:
+            - |
+              {
+                "StartAt": "Delay",
+                "Comment": "Publish to SNS with delay",
+                "States": {
+                  "Delay": {
+                    "Type": "Wait",
+                    "SecondsPath": "$.delay_seconds",
+                    "Next": "Publish to SNS"
+                  },
+                  "Publish to SNS": {
+                    "Type": "Task",
+                    "Resource": "arn:aws:states:::sns:publish",
+                    "Parameters": {
+                      "TopicArn": "${ThingTopic}",
+                      "Subject.$": "$.subject",
+                      "Message.$": "$.message"
+                    },
+                    "End": true
+                  }
+                }
+              }
+            - SNSTopic: !Ref ThingTopic
+
     ThingDynamoDBTable:
       Type: 'AWS::DynamoDB::Table'
       Properties:
