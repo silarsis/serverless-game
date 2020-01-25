@@ -7,6 +7,8 @@ plugins:
   - serverless-pseudo-parameters
   - serverless-python-requirements
 custom:
+  pythonRequirements:
+    pythonBin: python3
   defaultRegion: ap-southeast-1
   tables:
     thingName: 'thing-table-${self:provider.stage}'
