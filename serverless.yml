@@ -9,7 +9,7 @@ custom:
   thingTableName: 'thing-table-${self:provider.stage}'
   locationTableName: 'location-table-${self:provider.stage}'
   contentsTableName: 'contents-table-${self:provider.stage}'
-  LocationsTableName: 'locations-table-${self:provider.stage}'
+  locationsTableName: 'locations-table-${self:provider.stage}'
   thingTopic: 'thing-topic-${self:provider.stage}'
   MessageDelayerName: 'message-delayer-${self:provider.stage}'
 
@@ -93,7 +93,8 @@ resources:
                 - "sts:AssumeRole"
               Principal:
                 Service:
-                  - !Sub "states.${AWS::Region}.amazonaws.com"
+                  - !Sub
+                    !Join ["", ["states.", !Ref "AWS::Region", ".amazonaws.com"]]
         Policies:
           - PolicyName: "PublishToSNSTopic"
             PolicyDocument:
