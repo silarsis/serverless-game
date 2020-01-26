@@ -67,7 +67,6 @@ class Call(UserDict):
         )
 
     def after(self, seconds: int = 0) -> None:
-        self.data['delay_seconds'] = seconds
         sfn = boto3.client('stepfunctions')
         return sfn.start_execution(
             stateMachineArn=environ['MESSAGE_DELAYER_ARN'],
