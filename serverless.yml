@@ -81,22 +81,22 @@ functions:
             aspect:
               - Location
 
-    landCreator:
-      handler: aspects/landCreator.handler
-      VpcId:
-        Ref:
-          Fn::ImportValue: VpcId
-      package:
-        exclude:
-          - ./**
-        include:
-          - aspects/**
-      events:
-        - sns:
-            arn: "arn:aws:sns:#{AWS::Region}:#{AWS::AccountId}:${self:custom.topics.thingName}"
-            filterPolicy:
-              aspect:
-                - LandCreator
+  landCreator:
+    handler: aspects/landCreator.handler
+    VpcId:
+      Ref:
+        Fn::ImportValue: VpcId
+    package:
+      exclude:
+        - ./**
+      include:
+        - aspects/**
+    events:
+      - sns:
+          arn: "arn:aws:sns:#{AWS::Region}:#{AWS::AccountId}:${self:custom.topics.thingName}"
+          filterPolicy:
+            aspect:
+              - LandCreator
 
 resources:
   Resources:
