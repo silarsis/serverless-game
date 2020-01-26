@@ -50,7 +50,6 @@ class Call(UserDict):
         logging.debug(self.data)
         return sns.publish(
             Message=json.dumps(self.data),
-            MessageStructure='json',
             MessageAttributes={
                 'aspect': {
                     'DataType': 'String',
