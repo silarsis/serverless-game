@@ -19,7 +19,7 @@ class LandCreator(Location):
         }
         for loc in self.locations:
             # Randomly pick a direction - n, s, e, w
-            exit = random.choice(directions)
+            exit = random.choice(list(directions.keys()))
             # If that exit already exists, take it
             if exit in loc.exits:
                 self.move(loc.uuid, loc.exits[exit])

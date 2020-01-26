@@ -11,6 +11,15 @@ EventType = Dict[str, Any]  # Actually needs to be json-able
 IdType = str  # This is a UUID cast to a str, but I want to identify it for typing purposes
 
 
+def callable(func):
+    def wrapper(*args, **kwargs):
+        logging.debug("Calling {} with {}, {}".format(str(func), str(args), str(kwargs)))
+        result = func(*args, **kwargs)
+        assert(isinstance(result, dict) or result is None)
+        return result
+    return wrapper
+
+
 class Call(UserDict):
     def __init__(self, tid: str, originator: IdType, uuid: IdType, aspect: str, action: str, **kwargs):
         super().__init__()
@@ -87,16 +96,20 @@ class Thing(UserDict):
     def _table(self):
         return boto3.resource('dynamodb').Table(environ[self._tableName])
 
+    @callable
     def create(self) -> None:
         self._save()
 
+    @callable
     def destroy(self) -> None:
         self._table.delete_item(Key={'uuid': self.uuid})
         logging.debug("{} has been destroyed".format(self.uuid))
 
+    @callable
     def tick(self) -> None:
         self.schedule_next_tick()
 
+    @callable
     def schedule_next_tick(self) -> None:
         Call(str(uuid4()), self.uuid, self.uuid, self.aspectName, 'tick').after(seconds=self.tickDelay)
 
