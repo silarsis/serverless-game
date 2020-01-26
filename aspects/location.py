@@ -53,7 +53,7 @@ class Location(Thing):
 
     @property
     def locations(self) -> List[IdType]:
-        locations = self._locations.get_item(KeyConditionExpression=self._condition)
+        locations = self._locations.get_item(Key={'uuid': self.uuid})
         return [item['location'] for item in locations['Items']]
 
     def add_location(self, value: IdType):
