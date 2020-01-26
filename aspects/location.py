@@ -36,37 +36,37 @@ class Location(Thing):
 
     @property
     def contents(self) -> List[IdType]:
-        contents = self._contents.query(KeyConditionExpression=self._condition)
-        return [item['contains'] for item in contents['Items']]
+        return self.data.setdefault('contents', [])
 
-    def add_contents(self, value: IdType) -> None:
-        self._contents.put_item(
-            Item={'uuid': self.uuid, 'contains': value}
-        )
+    def add_contents(self, value: IdType) -> List[IdType]:
+        self.contents.append(value)
         logging.debug("{} now contains {}".format(self.uuid, value))
+        self.dirty = False
+        return self.contents
 
-    def remove_contents(self, value: IdType) -> None:
-        self._contents.delete_item(
-            Key={'uuid': self.uuid, 'contains': value}
-        )
-        logging.debug("{} no longer contains {}".format(self.uuid, value))
+    def remove_contents(self, value: IdType) -> List[IdType]:
+        if value in self.contents:
+            self.contents.remove(value)
+            logging.debug("{} no longer contains {}".format(self.uuid, value))
+            self.dirty = True
+        return self.contents
 
     @property
     def locations(self) -> List[IdType]:
-        locations = self._locations.get_item(Key={'uuid': self.uuid})
-        return [item['location'] for item in locations['Items']]
+        return self.data.setdefault('locations', [])
 
-    def add_location(self, value: IdType):
-        self._locations.put_item(
-            Item={'uuid': self.uuid, 'location': value}
-        )
+    def add_location(self, value: IdType) -> List[IdType]:
+        self.locations.append(value)
         logging.debug("{} is now located in {}".format(self.uuid, value))
+        self.dirty = True
+        return self.locations
 
-    def remove_location(self, value: IdType):
-        self._locations.delete_item(
-            Key={'uuid': self.uuid, 'location': value}
-        )
-        logging.debug("{} is no longer located in {}".format(self.uuid, value))
+    def remove_location(self, value: IdType) -> List[IdType]:
+        if value in self.locations:
+            self.locations.remove(value)
+            logging.debug("{} is no longer located in {}".format(self.uuid, value))
+            self.dirty = True
+        return self.locations
 
     def move(self, from_loc: IdType, to_loc: IdType):
         self.add_location(to_loc)
