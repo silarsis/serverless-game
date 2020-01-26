@@ -29,8 +29,10 @@ class TestThing(unittest.TestCase):
         environ['THING_TOPIC_ARN'] = boto3.resource('sns').create_topic(Name='ThingTopic').arn
 
     def _createTestSFN(self):
-        boto3.client('stepfunction').create_state_machine(
-            name='test'
+        boto3.client('stepfunctions').create_state_machine(
+            name='test',
+            definition='',
+            roleArn=''
         )
 
     def test_fail_no_tablename(self):
