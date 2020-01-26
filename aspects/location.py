@@ -25,13 +25,13 @@ class Location(Thing):
 
     def add_exit(self, direction: str, destination: IdType) -> ExitsType:
         self.data['exits'][direction] = destination
-        self.dirty = True
+        self._save()
         return self.data['exits']
 
     def remove_exit(self, direction: str) -> ExitsType:
         if direction in self.data['exits']:
             del(self.data['exits'][direction])
-            self.dirty = True
+            self._save()
         return self.data['exits']
 
     @property
@@ -41,14 +41,14 @@ class Location(Thing):
     def add_contents(self, value: IdType) -> List[IdType]:
         self.contents.append(value)
         logging.debug("{} now contains {}".format(self.uuid, value))
-        self.dirty = False
+        self._save()
         return self.contents
 
     def remove_contents(self, value: IdType) -> List[IdType]:
         if value in self.contents:
             self.contents.remove(value)
             logging.debug("{} no longer contains {}".format(self.uuid, value))
-            self.dirty = True
+            self._save()
         return self.contents
 
     @property
@@ -58,14 +58,14 @@ class Location(Thing):
     def add_location(self, value: IdType) -> List[IdType]:
         self.locations.append(value)
         logging.debug("{} is now located in {}".format(self.uuid, value))
-        self.dirty = True
+        self._save()
         return self.locations
 
     def remove_location(self, value: IdType) -> List[IdType]:
         if value in self.locations:
             self.locations.remove(value)
             logging.debug("{} is no longer located in {}".format(self.uuid, value))
-            self.dirty = True
+            self._save()
         return self.locations
 
     def move(self, from_loc: IdType, to_loc: IdType):

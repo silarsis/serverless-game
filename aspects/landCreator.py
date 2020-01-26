@@ -26,9 +26,11 @@ class LandCreator(Location):
                 self.move(loc.uuid, loc.exits[exit])
             # Otherwise, create a new exit with no land
             else:
-                new_loc = Location()
+                new_loc = Location(tid=self.tid)
                 new_loc.add_exit(directions[exit], loc.uuid)
                 loc.add_exit(exit, new_loc.uuid)
+                new_loc._save()
+            loc._save()
         self.schedule_next_tick()
 
 
