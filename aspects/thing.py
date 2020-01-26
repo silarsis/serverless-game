@@ -62,6 +62,14 @@ class Call(UserDict):
                 'aspect': {
                     'DataType': 'String',
                     'StringValue': self.data['aspect']
+                },
+                'action': {
+                    'DataType': 'String',
+                    'StringValue': self.data['action']
+                },
+                'uuid': {
+                    'DataType': 'String',
+                    'StringValue': self.data['uuid']
                 }
             }
         )
