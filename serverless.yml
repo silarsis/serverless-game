@@ -22,6 +22,9 @@ custom:
 provider:
   name: aws
   runtime: python3.8
+  memorySize: 128
+  tracing:
+lambda: true
   region: ${opt:region, self:custom.defaultRegion}
   iamRoleStatements:
     - Effect: Allow
