@@ -36,6 +36,11 @@ provider:
         - { "Fn::GetAtt": ["ThingDynamoDBTable", "Arn" ] }
         - { "Fn::GetAtt": ["LocationDynamoDBTable", "Arn" ] }
         - { "Fn::GetAtt": ["ContentsDynamoDBTable", "Arn" ] }
+    - Effect: Allow
+      Action:
+        - states:StartExecution
+      Resource:
+        - !Ref MessageDelayer
   environment:
     THING_TABLE: ${self:custom.tables.thingName}
     LOCATION_TABLE: ${self:custom.tables.locationName}
