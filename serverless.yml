@@ -43,7 +43,8 @@ provider:
     LOCATIONS_TABLE: ${self:custom.tables.locationsName}
     THING_TOPIC_ARN: !Ref ThingTopic
     MESSAGE_DELAYER_ARN: !Ref MessageDelayer
-    LIGHTSTEP_ACCESS_TOKEN: ${param:lightstep_access_token}
+    DD_TRACE_AGENT_URL: 'https://ingest.lightstep.com:443'
+    DD_TRACE_GLOBAL_TAGS: "lightstep.service_name:serverless-game,lightstep.access_token:${param:lightstep_access_token}"
 
 functions:
   thing:
