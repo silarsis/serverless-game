@@ -1,6 +1,7 @@
 import json
 import logging
-logging.basicConfig(level=logging.DEBUG)
+logging.getLogger().setLevel(logging.DEBUG)
+
 
 # # LightStep recommended tracing
 # TODO: Commented out until I sort out the compilation requirements
