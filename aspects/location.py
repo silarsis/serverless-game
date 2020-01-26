@@ -40,14 +40,14 @@ class Location(Thing):
 
     def add_contents(self, value: IdType) -> List[IdType]:
         self.contents.append(value)
-        logging.debug("{} now contains {}".format(self.uuid, value))
+        logging.info("{} now contains {}".format(self.uuid, value))
         self._save()
         return self.contents
 
     def remove_contents(self, value: IdType) -> List[IdType]:
         if value in self.contents:
             self.contents.remove(value)
-            logging.debug("{} no longer contains {}".format(self.uuid, value))
+            logging.info("{} no longer contains {}".format(self.uuid, value))
             self._save()
         return self.contents
 
@@ -57,14 +57,14 @@ class Location(Thing):
 
     def add_location(self, value: IdType) -> List[IdType]:
         self.locations.append(value)
-        logging.debug("{} is now located in {}".format(self.uuid, value))
+        logging.info("{} is now located in {}".format(self.uuid, value))
         self._save()
         return self.locations
 
     def remove_location(self, value: IdType) -> List[IdType]:
         if value in self.locations:
             self.locations.remove(value)
-            logging.debug("{} is no longer located in {}".format(self.uuid, value))
+            logging.info("{} is no longer located in {}".format(self.uuid, value))
             self._save()
         return self.locations
 

@@ -14,7 +14,7 @@ IdType = str  # This is a UUID cast to a str, but I want to identify it for typi
 
 def callable(func):
     def wrapper(*args, **kwargs):
-        logging.debug("Calling {} with {}, {}".format(str(func), str(args), str(kwargs)))
+        logging.info("Calling {} with {}, {}".format(str(func), str(args), str(kwargs)))
         result = func(*args, **kwargs)
         assert(isinstance(result, dict) or result is None)
         return result
@@ -55,7 +55,7 @@ class Call(UserDict):
 
     def now(self) -> None:
         sns = boto3.resource('sns').Topic(environ['THING_TOPIC_ARN'])
-        logging.debug(self.data)
+        logging.info(self.data)
         return sns.publish(
             Message=json.dumps(self.data, cls=DecimalEncoder),
             MessageAttributes={
@@ -112,7 +112,7 @@ class Thing(UserDict):
     @callable
     def destroy(self) -> None:
         self._table.delete_item(Key={'uuid': self.uuid})
-        logging.debug("{} has been destroyed".format(self.uuid))
+        logging.info("{} has been destroyed".format(self.uuid))
 
     @callable
     def tick(self) -> None:
