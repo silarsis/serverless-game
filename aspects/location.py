@@ -74,6 +74,8 @@ class Location(Thing):
 
     def create(self) -> None:
         self.data['exits'] = {}
+        self.data['locations'] = []
+        self.data['contents'] = []
         super().create()
 
     def destroy(self):
