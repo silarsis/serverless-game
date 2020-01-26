@@ -24,7 +24,7 @@ provider:
   runtime: python3.8
   memorySize: 128
   tracing:
-lambda: true
+    lambda: true
   region: ${opt:region, self:custom.defaultRegion}
   iamRoleStatements:
     - Effect: Allow
