@@ -6,6 +6,7 @@ from typing import Dict, Any
 from collections import UserDict
 import logging
 import importlib
+import decimal
 
 EventType = Dict[str, Any]  # Actually needs to be json-able
 IdType = str  # This is a UUID cast to a str, but I want to identify it for typing purposes
@@ -18,6 +19,13 @@ def callable(func):
         assert(isinstance(result, dict) or result is None)
         return result
     return wrapper
+
+
+class DecimalEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, decimal.Decimal):
+            return int(obj)
+        return super(DecimalEncoder, self).default(obj)
 
 
 class Call(UserDict):
@@ -49,7 +57,7 @@ class Call(UserDict):
         sns = boto3.resource('sns').Topic(environ['THING_TOPIC_ARN'])
         logging.debug(self.data)
         return sns.publish(
-            Message=json.dumps(self.data),
+            Message=json.dumps(self.data, cls=DecimalEncoder),
             MessageAttributes={
                 'aspect': {
                     'DataType': 'String',
@@ -66,7 +74,7 @@ class Call(UserDict):
             input=json.dumps({
                 'delay_seconds': seconds,
                 'data': self.data
-            })
+            }, cls=DecimalEncoder)
         )
 
 
