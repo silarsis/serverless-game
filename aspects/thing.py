@@ -131,7 +131,7 @@ class Thing(UserDict):
             assert(event['action'] == 'create')
         tid = str(event.get('tid') or uuid4())
         actor = cls(uuid, tid)
-        response: EventType = getattr(actor, event['action'])(**event['data'])
+        response: EventType = getattr(actor, event['action'])(**event.get('data', {}))
         if event.get('callback'):
             c = event['callback']
             data = c['data']

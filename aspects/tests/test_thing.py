@@ -1,5 +1,5 @@
 import unittest
-from moto import mock_dynamodb2, mock_sns, mock_stepfunctions
+from moto import mock_dynamodb2, mock_sns, mock_stepfunctions, mock_iam
 import boto3
 from aspects import thing
 from os import environ
@@ -59,7 +59,7 @@ class TestThing(unittest.TestCase):
                 }
             }
           """,
-            roleArn='arn:aws:sns:ap-southeast-1:1234567890:ThingTopicName'
+            roleArn='arn:aws:iam::1234567890:role/serverless-game-prod/serverless-game-prod-StepFunctionsServiceRole-RANDOMSTUFF'
         )
 
     def test_fail_no_tablename(self):
@@ -100,6 +100,7 @@ class TestThing(unittest.TestCase):
 
     # @mock_dynamodb2
     # @mock_stepfunctions
+    # @mock_iam
     # def test_tick(self):
     #     self._createTestTable()
     #     self._createTestSFN()
