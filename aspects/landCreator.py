@@ -17,7 +17,8 @@ class LandCreator(Location):
             'west': 'east',
             'east': 'west'
         }
-        for loc in self.locations:
+        for loc_uuid in self.locations:
+            loc = Location(uuid=loc_uuid, tid=self.tid)
             # Randomly pick a direction - n, s, e, w
             exit = random.choice(list(directions.keys()))
             # If that exit already exists, take it
