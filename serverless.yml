@@ -157,6 +157,7 @@ resources:
                 "Parameters": {
                   "TopicArn": "arn:aws:sns:#{AWS::Region}:#{AWS::AccountId}:${self:custom.topics.thingName}",
                   "Message.$": "$.data",
+                  "MessageStructure": "json",
                   "MessageAttributes": {
                     "aspect": {
                       "DataType": "String",

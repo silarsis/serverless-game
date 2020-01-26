@@ -47,6 +47,7 @@ class Call(UserDict):
 
     def now(self) -> None:
         sns = boto3.resource('sns').Topic(environ['THING_TOPIC_ARN'])
+        logging.debug(self.data)
         return sns.publish(
             Message=json.dumps(self.data),
             MessageStructure='json',
@@ -88,9 +89,10 @@ class Thing(UserDict):
 
     @property
     def tickDelay(self):
-        if 'tick_delay' in self.data:
-            return self.data['tick_delay']
-        return 30
+        if 'tick_delay' not in self.data:
+            self.data['tick_delay'] = 30
+            self._save()
+        return self.data['tick_delay']
 
     @property
     def _table(self):
