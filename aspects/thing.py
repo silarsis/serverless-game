@@ -63,7 +63,7 @@ class Call(UserDict):
 
 class Thing(UserDict):
     " Thing objects have state (stored in dynamo) and know how to event and callback "
-    _tableName: str = ''  # Set this in the subclass
+    _tableName: str = 'thing'  # Set this in the subclass
 
     def __init__(self, uuid: IdType = None, tid: str = None):
         super().__init__()

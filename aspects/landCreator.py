@@ -1,10 +1,10 @@
-import thing
+from thing import Thing
 from handler import lambdaHandler
 from location import Location
 import random
 
 
-class LandCreator(thing):
+class LandCreator(Thing):
     " This entity creates new exits and moves "
     def create(self):
         # Land creators are mobs, so they're location aware
