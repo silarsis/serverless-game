@@ -31,8 +31,35 @@ class TestThing(unittest.TestCase):
     def _createTestSFN(self):
         boto3.client('stepfunctions').create_state_machine(
             name='test',
-            definition='',
-            roleArn=''
+            definition="""
+                {
+                "StartAt": "Delay",
+                "Comment": "Publish to SNS with delay",
+                "States": {
+                "Delay": {
+                    "Type": "Wait",
+                    "SecondsPath": "$.delay_seconds",
+                    "Next": "Publish to SNS"
+                },
+                "Publish to SNS": {
+                    "Type": "Task",
+                    "Resource": "arn:aws:states:::sns:publish",
+                    "Parameters": {
+                    "TopicArn": "arn:aws:sns:ap-southeast-1:1234567890:ThingTopicName",
+                    "Message.$": "$.data",
+                    "MessageAttributes": {
+                        "aspect": {
+                        "DataType": "String",
+                        "StringValue": "$.data.aspect"
+                        }
+                    }
+                    },
+                    "End": true
+                }
+                }
+            }
+          """,
+            roleArn='arn:aws:sns:ap-southeast-1:1234567890:ThingTopicName'
         )
 
     def test_fail_no_tablename(self):

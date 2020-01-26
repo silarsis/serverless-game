@@ -126,7 +126,9 @@ class Thing(UserDict):
     @classmethod
     def _action(cls, event: EventType):  # This is not state related, this is the entry point for the object
         assert(not event['action'].startswith('_'))
-        uuid = event['uuid']
+        uuid = event.get('uuid')  # Allowing for no uuid for creation
+        if not uuid:
+            assert(event['action'] == 'create')
         tid = str(event.get('tid') or uuid4())
         actor = cls(uuid, tid)
         response: EventType = getattr(actor, event['action'])(**event['data'])
