@@ -24,7 +24,8 @@ is triggered.
 
 Each aspect will have it's own table of data - so all the data and methods for
 a given object are actually spread across multiple databases and aspects, all
-of which only care about their own concerns.
+of which only care about their own concerns. They're tied together by uuid. This
+saves from collisions between aspects on data names.
 
 This way, aspects can be added and removed easily - add a lambda and SNS
 subscription, and add the aspect to the appropriate objects in DynamoDB
@@ -50,8 +51,17 @@ it. If you want to get information about another entity, you throw an event
 that triggers an action on that entity and also provides a callback for the
 method to go to once that data is there.
 
-How do we do aggregates? I think it'll probably require aggregation objects,
-but let's chase that through and see as we build it.
+The above raises a series of challenges if it's done for all inter-object
+comms:
+
+* How do we do aggregation?
+* How do we manipulate return values in the chain so we can map from call to call?
+* How do we make the coding not too horrific for callbacks?
+
+So, in the meantime we've also got an ability to instantiate other objects and
+aspects locally. Once I've figured out solutions for the above, I may come back and
+convert everything to callback, not sure. At least, there needs to be events when
+things change.
 
 ## Example Event Streams
 
@@ -59,11 +69,8 @@ but let's chase that through and see as we build it.
 
 ```yaml
 event:
-  aspect: entity
+  aspect: mob
   action: create
-  aspects:
-    - mob
-  request_uuid: <uuid of this request>
 ```
 
 Creates a mob in the given location. Presumably there will be more details in
@@ -73,10 +80,9 @@ This will cause the following sequence of events:
 
 ```yaml
 event:
-  aspect: entity
+  aspect: mob
   action: created
-  request_uuid: <uuid of the request>
-  new_uuid: <uuid of the new entity>
+  uuid: <uuid of the new entity>
 ```
 
 TODO: This is horrible. Synchronous events probably need something other than
@@ -86,45 +92,29 @@ the event bus. Think more.
 event:
   aspect: location
   action: arrive
-  actor_uuid: <mob uuid>
-  target_uuid: <location uuid>
+  uuid: <mob uuid>
+  destination: <location uuid>
 ```
 
 ```yaml
 event:
   aspect: movement
   action: arrive
-  actor_uuid: <mob uuid>
-  target_uuid: <location uuid>
-```
-
-### Mob moving to a new location
-
-```yaml
-event:
-  aspect: movement
-  action: leave
-  actor_uuid: <mob uuid>
-  direction: <str>
-event:
-  aspect: movement
-  action: arrive
-  actor_uuid: <mob uuid>
-  target_uuid: <new location uuid>
+  uuid: <mob uuid>
+  destination: <location uuid>
 ```
 
 ### "Say" something
 
 This one is interesting. The actor says something - the event with the speech
 is thrown out for anyone to listen to, but how do you know what can hear it?
-The aspect will
 
 ```yaml
 event:
   aspect: sound
   action: say
-  actor_uuid: <mob uuid>
-  location_uuid: <location uuid>
+  uuid: <mob uuid>
+  location: <location uuid>
   speech: <str>
 ```
 
@@ -132,18 +122,11 @@ event:
 
 ### Location
 
-An entity can be "in" a location. A location can "contain" entities. Note that
-a location is just an entity that can hold other entities (it has the "location"
-aspect).
-
-Do we store both of these - entity with a link to location, and location with
-a link to entities?
-
-Or do we store the relationships somewhere - a list of "entities inside other
-entities" - somehow?
-
-I'm actually inclined to say the "location" aspect has it's own dynamodb table
-containing (entity, contains) tuples - one for each direct relationship.
+The Location aspect has it's own table, and stores "locations" (a list of
+IDs for other objects it is in) and "contents" (a list of IDs for objects
+that are in it). Moving requires unpicking both sides of that relationship.
+This is done for speed, although I may be able to index the table better and
+drop one side of the data.
 
 ## Concepts / required aspects
 
@@ -163,13 +146,13 @@ user, and it wants to "look". It might send an event:
 ```yaml
 event:
   tid: <uuid of transaction>
-  target_uuid: <uuid of location player is in>
+  uui: <uuid of location player is in>
   aspect: location
   action: list_contained
   callback_data:
     aspect: location
     action: pretty_print
-    actor_uuid: <uuid of player>
+    uuid: <uuid of player>
     user: derrick
 ```
 
@@ -201,3 +184,8 @@ event:
     data: {}
 
 ```
+
+Note you can embed arbitrarily deep callbacks in the callback structure.
+
+Note also there's a 32Kb limit on packet size because it may go through
+step functions for delayed messages.
