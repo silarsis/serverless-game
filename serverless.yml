@@ -55,8 +55,8 @@ provider:
     DD_TRACE_GLOBAL_TAGS: "lightstep.service_name:serverless-game,lightstep.access_token:${param:lightstep_access_token}"
 
 functions:
-  thing:
-    handler: aspects/thing.handler
+  eventlogger:
+    handler: aspects/eventLogger.handler
     VpcId:
       Ref:
         Fn::ImportValue: VpcId
@@ -68,9 +68,6 @@ functions:
     events:
       - sns:
           arn: "arn:aws:sns:#{AWS::Region}:#{AWS::AccountId}:${self:custom.topics.thingName}"
-          filterPolicy:
-            aspect:
-              - Thing
 
   location:
     handler: aspects/location.handler
