@@ -1,6 +1,7 @@
 from handler import lambdaHandler
 from location import Location
 import random
+import logging
 
 
 class LandCreator(Location):
@@ -30,6 +31,7 @@ class LandCreator(Location):
                 new_loc.add_exit(directions[exit], loc.uuid)
                 loc.add_exit(exit, new_loc.uuid)
                 new_loc._save()
+                logging.info("I created a new piece of land, {} of here".format(exit))
             loc._save()
         self.schedule_next_tick()
 
