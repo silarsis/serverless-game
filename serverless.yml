@@ -160,15 +160,15 @@ resources:
                   "MessageAttributes": {
                     "aspect": {
                       "DataType": "String",
-                      "StringValue": "$.data.aspect"
+                      "StringValue.$": "$.data.aspect"
                     },
                     "action": {
                       "DataType": "String",
-                      "StringValue": "$.data.action"
+                      "StringValue.$": "$.data.action"
                     },
                     "uuid": {
                       "DataType": "String",
-                      "StringValue": "$.data.uuid"
+                      "StringValue.$": "$.data.uuid"
                     }
                   }
                 },
