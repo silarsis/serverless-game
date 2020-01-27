@@ -1,9 +1,4 @@
-from handler import lambdaHandler
 
 
-class EventLogger():
-    def _action(self, message):
-        pass
-
-
-handler = lambdaHandler(EventLogger)
+def handler(event: dict, context: dict):
+    logging.info(json.dumps(event, indent=2))
