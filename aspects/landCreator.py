@@ -6,10 +6,12 @@ import logging
 
 class LandCreator(Location):
     " This entity creates new exits and moves "
+    @callable
     def create(self):
         # Randomly assign myself a starting position
-        pass
+        super().create()
 
+    @callable
     def tick(self):
         # Get a list of exits in the location I'm in
         directions = {
