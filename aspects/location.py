@@ -15,8 +15,6 @@ class Location(Thing):
 
     def __init__(self, uuid: IdType = None, tid: str = None):
         super().__init__(uuid, tid)
-        self._locationsTable = boto3.resource('dynamodb').Table(environ['LOCATIONS_TABLE'])
-        self._locationCondition = Key('uuid').eq(self.uuid)
         self._contentsCondition = Key('location').eq(self.uuid)
 
     @property
@@ -40,7 +38,7 @@ class Location(Thing):
     def contents(self) -> List[IdType]:
         return [  # TODO: factor this out to deal with large response sets
             item['uuid']
-            for item in self._locationsTable.query(
+            for item in self._table.query(
                 IndexName='contents',
                 Select='ALL_PROJECTED_ATTRIBUTES',
                 KeyConditionExpression=self._contentsCondition
@@ -49,12 +47,12 @@ class Location(Thing):
 
     @property
     def location(self) -> Optional[IdType]:
-        return self._locationsTable.get_item(Key={'uuid': self.uuid}).get('Item', {})['location']
+        return self.data['location']
 
     @location.setter
     def location(self, loc_id: IdType):
-        print("set location {}".format(loc_id))
-        self._locationsTable.put_item(Item={'uuid': self.uuid, 'location': loc_id})
+        self.data['location'] = loc_id
+        self._save()
 
     @callable
     def create(self) -> None:
@@ -66,7 +64,7 @@ class Location(Thing):
         dest = self.location or 'Nowhere'  # TODO: Figure out a better location for dropping objects
         for item in self.contents:
             Location(item, self.tid).location = dest
-        self.location = 'Destroyed'
+        self._table.delete_item(Key={'uuid': self.uuid})
 
 
 handler = lambdaHandler(Location)

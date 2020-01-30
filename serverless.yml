@@ -37,7 +37,6 @@ provider:
       Resource:
         - { "Fn::GetAtt": ["ThingDynamoDBTable", "Arn" ] }
         - { "Fn::GetAtt": ["LocationDynamoDBTable", "Arn" ] }
-        - { "Fn::GetAtt": ["LocationsDynamoDBTable", "Arn" ] }
     - Effect: Allow
       Action:
         - states:StartExecution
@@ -197,21 +196,6 @@ resources:
           -
             AttributeName: uuid
             AttributeType: S
-        KeySchema:
-          -
-            AttributeName: uuid
-            KeyType: HASH
-        ProvisionedThroughput:
-          ReadCapacityUnits: 1
-          WriteCapacityUnits: 1
-        TableName: ${self:custom.tables.locationName}
-    LocationsDynamoDBTable:
-      Type: 'AWS::DynamoDB::Table'
-      Properties:
-        AttributeDefinitions:
-          -
-            AttributeName: uuid
-            AttributeType: S
           -
             AttributeName: location
             AttributeType: S
@@ -233,4 +217,4 @@ resources:
         ProvisionedThroughput:
           ReadCapacityUnits: 1
           WriteCapacityUnits: 1
-        TableName: ${self:custom.tables.locationsName}
+        TableName: ${self:custom.tables.locationName}

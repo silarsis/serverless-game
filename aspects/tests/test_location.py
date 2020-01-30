@@ -6,7 +6,6 @@ import boto3
 
 
 environ['LOCATION_TABLE'] = 'test_location_table'
-environ['LOCATIONS_TABLE'] = 'test_locations_table'
 
 mock_dynamodb2_instance = mock_dynamodb2()
 mock_dynamodb2_instance.start()
@@ -27,7 +26,7 @@ class TestLocation(unittest.TestCase):
                     'AttributeType': 'S'
                 }
             ],
-            TableName=environ['LOCATIONS_TABLE'],
+            TableName=environ['LOCATION_TABLE'],
             KeySchema=[
                 {
                     'AttributeName': 'uuid',
@@ -56,25 +55,6 @@ class TestLocation(unittest.TestCase):
                 'ReadCapacityUnits': 1,
                 'WriteCapacityUnits': 1
             }
-        )
-        boto3.resource('dynamodb').create_table(
-            AttributeDefinitions=[
-                {
-                    'AttributeName': 'uuid',
-                    'AttributeType': 'S'
-                }
-            ],
-            KeySchema=[
-                {
-                    'AttributeName': 'uuid',
-                    'KeyType': 'HASH'
-                }
-            ],
-            ProvisionedThroughput={
-                'ReadCapacityUnits': 1,
-                'WriteCapacityUnits': 1
-            },
-            TableName=environ['LOCATION_TABLE']
         )
 
     def tearDown(self):
