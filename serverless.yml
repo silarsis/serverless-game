@@ -37,7 +37,7 @@ provider:
       Resource:
         - { "Fn::GetAtt": ["ThingDynamoDBTable", "Arn" ] }
         - { "Fn::GetAtt": ["LocationDynamoDBTable", "Arn" ] }
-        - { "Fn::GetAtt": ["ContentsDynamoDBTable", "Arn" ] }
+        - { "Fn::GetAtt": ["LocationsDynamoDBTable", "Arn" ] }
     - Effect: Allow
       Action:
         - states:StartExecution
