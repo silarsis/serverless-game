@@ -13,7 +13,7 @@ custom:
   tables:
     thingName: 'thing-table-${self:provider.stage}'
     locationName: 'location-table-${self:provider.stage}'
-    locationsName: 'locations-table-${self:provider.stage}'
+    landName: 'land-table-${self:provider.stage}'
   topics:
     thingName: 'thing-topic-${self:provider.stage}'
   MessageDelayerName: 'message-delayer-${self:provider.stage}'
@@ -37,6 +37,7 @@ provider:
       Resource:
         - { "Fn::GetAtt": ["ThingDynamoDBTable", "Arn" ] }
         - { "Fn::GetAtt": ["LocationDynamoDBTable", "Arn" ] }
+        - { "Fn::GetAtt": ["LandDynamoDBTable", "Arn" ] }
     - Effect: Allow
       Action:
         - states:StartExecution
@@ -45,7 +46,7 @@ provider:
   environment:
     THING_TABLE: ${self:custom.tables.thingName}
     LOCATION_TABLE: ${self:custom.tables.locationName}
-    LOCATIONS_TABLE: ${self:custom.tables.locationsName}
+    LAND_TABLE: ${self:custom.tables.landName}
     THING_TOPIC_ARN: !Ref ThingTopic
     MESSAGE_DELAYER_ARN: !Ref MessageDelayer
     DD_TRACE_AGENT_URL: 'https://ingest.lightstep.com:443'
@@ -82,6 +83,23 @@ functions:
           filterPolicy:
             aspect:
               - Location
+
+  land:
+    handler: aspects/land.handler
+    VpcId:
+      Ref:
+        Fn::ImportValue: VpcId
+    package:
+      exclude:
+        - ./**
+      include:
+        - aspects/**
+    events:
+      - sns:
+          arn: "arn:aws:sns:#{AWS::Region}:#{AWS::AccountId}:${self:custom.topics.thingName}"
+          filterPolicy:
+            aspect:
+              - Land
 
   landCreator:
     handler: aspects/landCreator.handler
@@ -189,6 +207,7 @@ resources:
           ReadCapacityUnits: 1
           WriteCapacityUnits: 1
         TableName: ${self:custom.tables.thingName}
+
     LocationDynamoDBTable:
       Type: 'AWS::DynamoDB::Table'
       Properties:
@@ -204,16 +223,62 @@ resources:
             AttributeName: uuid
             KeyType: HASH
         GlobalSecondaryIndexes:
-          IndexName: "contents"
-          KeySchema:
-            -
-              AttributeName: location
-              KeyType: HASH
-            -
-              AttributeName: uuid
-              KeyType: RANGE
-          Projection:
-            ProjectionType: KEYS_ONLY
+          -
+            IndexName: "contents"
+            KeySchema:
+              -
+                AttributeName: location
+                KeyType: HASH
+              -
+                AttributeName: uuid
+                KeyType: RANGE
+            Projection:
+              ProjectionType: KEYS_ONLY
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        TableName: ${self:custom.tables.locationName}
+
+    LandDynamoDBTable:
+      Type: 'AWS::DynamoDB::Table'
+      Properties:
+        AttributeDefinitions:
+          -
+            AttributeName: uuid
+            AttributeType: S
+          -
+            AttributeName: location
+            AttributeType: S
+          -
+            AttributeName: coordinates
+            AttributeType: L
+        KeySchema:
+          -
+            AttributeName: uuid
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          -
+            IndexName: "contents"
+            KeySchema:
+              -
+                AttributeName: location
+                KeyType: HASH
+              -
+                AttributeName: uuid
+                KeyType: RANGE
+            Projection:
+              ProjectionType: KEYS
+          -
+            IndexName: "cartesian"
+            KeySchema:
+              -
+                AttributeName: coordinates
+                KeyType: HASH
+              -
+                AttributeName: uuid
+                KeyType: RANGE
+            Projection:
+              ProjectionType: KEYS_ONLY
         ProvisionedThroughput:
           ReadCapacityUnits: 1
           WriteCapacityUnits: 1

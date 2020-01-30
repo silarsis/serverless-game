@@ -1,6 +1,4 @@
 from aspects.thing import Thing, IdType, callable
-import boto3
-from os import environ
 from boto3.dynamodb.conditions import Key
 from aspects.handler import lambdaHandler
 from typing import List, Dict, Optional
@@ -12,10 +10,6 @@ ExitsType = Dict[str, IdType]
 class Location(Thing):
     " All location aware things will have a Location aspect "
     _tableName = 'LOCATION_TABLE'
-
-    def __init__(self, uuid: IdType = None, tid: str = None):
-        super().__init__(uuid, tid)
-        self._contentsCondition = Key('location').eq(self.uuid)
 
     @property
     def exits(self) -> ExitsType:
@@ -41,7 +35,7 @@ class Location(Thing):
             for item in self._table.query(
                 IndexName='contents',
                 Select='ALL_PROJECTED_ATTRIBUTES',
-                KeyConditionExpression=self._contentsCondition
+                KeyConditionExpression=Key('location').eq(self.uuid)
             )['Items']
         ]
 

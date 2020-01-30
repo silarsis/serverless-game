@@ -1,5 +1,6 @@
 from aspects.handler import lambdaHandler
 from aspects.location import Location
+from aspects.land import Land
 import random
 import logging
 
@@ -8,8 +9,9 @@ class LandCreator(Location):
     " This entity creates new exits and moves "
     @callable
     def create(self):
-        # Randomly assign myself a starting position
+        loc_uuid = Land.by_coordinates((0, 0, 0))
         super().create()
+        self.location = loc_uuid
 
     @callable
     def tick(self):
@@ -20,21 +22,18 @@ class LandCreator(Location):
             'west': 'east',
             'east': 'west'
         }
-        for loc_uuid in self.locations:
-            loc = Location(uuid=loc_uuid, tid=self.tid)
-            # Randomly pick a direction - n, s, e, w
-            exit = random.choice(list(directions.keys()))
-            # If that exit already exists, take it
-            if exit in loc.exits:
-                self.move(loc.uuid, loc.exits[exit])
-            # Otherwise, create a new exit with no land
-            else:
-                new_loc = Location(tid=self.tid)
-                new_loc.add_exit(directions[exit], loc.uuid)
-                loc.add_exit(exit, new_loc.uuid)
-                new_loc._save()
-                logging.info("I created a new piece of land, {} of here".format(exit))
-            loc._save()
+        loc = Land(self.location, tid=self.tid)
+        # Randomly pick a direction - n, s, e, w
+        exit = random.choice(list(directions.keys()))
+        # If that exit already exists, take it
+        if exit in loc.exits:
+            self.move(loc.uuid, loc.exits[exit])
+        # Otherwise, create a new exit with no land
+        else:
+            new_loc = Land(uuid=loc.by_direction(exit))
+            new_loc.add_exit(directions[exit], loc.uuid)
+            loc.add_exit(exit, new_loc.uuid)
+            logging.info("I created a new piece of land, {} of here".format(exit))
         self.schedule_next_tick()
 
 

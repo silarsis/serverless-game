@@ -7,9 +7,6 @@ import boto3
 
 environ['LOCATION_TABLE'] = 'test_location_table'
 
-mock_dynamodb2_instance = mock_dynamodb2()
-mock_dynamodb2_instance.start()
-
 
 class TestLocation(unittest.TestCase):
     def setUp(self):
