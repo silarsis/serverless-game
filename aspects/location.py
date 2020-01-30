@@ -1,9 +1,9 @@
-from aspects.thing import Thing, IdType
+from aspects.thing import Thing, IdType, callable
 import boto3
+from os import environ
 from boto3.dynamodb.conditions import Key
-import logging
 from aspects.handler import lambdaHandler
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 
 ExitsType = Dict[str, IdType]
@@ -15,19 +15,21 @@ class Location(Thing):
 
     def __init__(self, uuid: IdType = None, tid: str = None):
         super().__init__(uuid, tid)
-        self._contents = boto3.resource('dynamodb').Table('CONTENTS_TABLE')
-        self._locations = boto3.resource('dynamodb').Table('LOCATIONS_TABLE')
-        self._condition = Key('uuid').eq(self.uuid)
+        self._locationsTable = boto3.resource('dynamodb').Table(environ['LOCATIONS_TABLE'])
+        self._locationCondition = Key('uuid').eq(self.uuid)
+        self._contentsCondition = Key('location').eq(self.uuid)
 
     @property
     def exits(self) -> ExitsType:
         return self.data['exits']
 
+    @callable
     def add_exit(self, direction: str, destination: IdType) -> ExitsType:
         self.data['exits'][direction] = destination
         self._save()
         return self.data['exits']
 
+    @callable
     def remove_exit(self, direction: str) -> ExitsType:
         if direction in self.data['exits']:
             del(self.data['exits'][direction])
@@ -36,58 +38,35 @@ class Location(Thing):
 
     @property
     def contents(self) -> List[IdType]:
-        return self.data.setdefault('contents', [])
-
-    def add_contents(self, value: IdType) -> List[IdType]:
-        self.contents.append(value)
-        logging.info("{} now contains {}".format(self.uuid, value))
-        self._save()
-        return self.contents
-
-    def remove_contents(self, value: IdType) -> List[IdType]:
-        if value in self.contents:
-            self.contents.remove(value)
-            logging.info("{} no longer contains {}".format(self.uuid, value))
-            self._save()
-        return self.contents
+        return [  # TODO: factor this out to deal with large response sets
+            item['uuid']
+            for item in self._locationsTable.query(
+                IndexName='contents',
+                Select='ALL_PROJECTED_ATTRIBUTES',
+                KeyConditionExpression=self._contentsCondition
+            )['Items']
+        ]
 
     @property
-    def locations(self) -> List[IdType]:
-        return self.data.setdefault('locations', [])
+    def location(self) -> Optional[IdType]:
+        return self._locationsTable.get_item(Key={'uuid': self.uuid}).get('Item', {})['location']
 
-    def add_location(self, value: IdType) -> List[IdType]:
-        self.locations.append(value)
-        logging.info("{} is now located in {}".format(self.uuid, value))
-        self._save()
-        return self.locations
+    @location.setter
+    def location(self, loc_id: IdType):
+        print("set location {}".format(loc_id))
+        self._locationsTable.put_item(Item={'uuid': self.uuid, 'location': loc_id})
 
-    def remove_location(self, value: IdType) -> List[IdType]:
-        if value in self.locations:
-            self.locations.remove(value)
-            logging.info("{} is no longer located in {}".format(self.uuid, value))
-            self._save()
-        return self.locations
-
-    def move(self, from_loc: IdType, to_loc: IdType):
-        self.add_location(to_loc)
-        self.remove_location(from_loc)
-
+    @callable
     def create(self) -> None:
         self.data['exits'] = {}
-        self.data['locations'] = []
-        self.data['contents'] = []
         super().create()
 
+    @callable
     def destroy(self):
-        if self.locations:
-            dest = self.locations[0]
-        else:
-            dest = 'Nowhere'  # TODO: Figure out a better solution for this
+        dest = self.location or 'Nowhere'  # TODO: Figure out a better location for dropping objects
         for item in self.contents:
-            Location(item, self.tid).move(self.uuid, dest)
-        for loc in self.locations:
-            Location(loc).remove_contents(self.uuid)
-            self.remove_location(loc)
+            Location(item, self.tid).location = dest
+        self.location = 'Destroyed'
 
 
 handler = lambdaHandler(Location)

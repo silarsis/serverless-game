@@ -13,7 +13,6 @@ custom:
   tables:
     thingName: 'thing-table-${self:provider.stage}'
     locationName: 'location-table-${self:provider.stage}'
-    contentsName: 'contents-table-${self:provider.stage}'
     locationsName: 'locations-table-${self:provider.stage}'
   topics:
     thingName: 'thing-topic-${self:provider.stage}'
@@ -47,7 +46,6 @@ provider:
   environment:
     THING_TABLE: ${self:custom.tables.thingName}
     LOCATION_TABLE: ${self:custom.tables.locationName}
-    CONTENTS_TABLE: ${self:custom.tables.contentsName}
     LOCATIONS_TABLE: ${self:custom.tables.locationsName}
     THING_TOPIC_ARN: !Ref ThingTopic
     MESSAGE_DELAYER_ARN: !Ref MessageDelayer
@@ -207,7 +205,7 @@ resources:
           ReadCapacityUnits: 1
           WriteCapacityUnits: 1
         TableName: ${self:custom.tables.locationName}
-    ContentsDynamoDBTable:
+    LocationsDynamoDBTable:
       Type: 'AWS::DynamoDB::Table'
       Properties:
         AttributeDefinitions:
@@ -215,16 +213,24 @@ resources:
             AttributeName: uuid
             AttributeType: S
           -
-            AttributeName: contains
+            AttributeName: location
             AttributeType: S
         KeySchema:
           -
             AttributeName: uuid
             KeyType: HASH
-          -
-            AttributeName: contains
-            KeyType: RANGE
+        GlobalSecondaryIndexes:
+          IndexName: "contents"
+          KeySchema:
+            -
+              AttributeName: location
+              KeyType: HASH
+            -
+              AttributeName: uuid
+              KeyType: RANGE
+          Projection:
+            ProjectionType: KEYS_ONLY
         ProvisionedThroughput:
           ReadCapacityUnits: 1
           WriteCapacityUnits: 1
-        TableName: ${self:custom.tables.contentsName}
+        TableName: ${self:custom.tables.locationsName}

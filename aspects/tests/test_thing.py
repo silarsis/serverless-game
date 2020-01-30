@@ -14,7 +14,10 @@ environ['MESSAGE_DELAYER_ARN'] = 'test'
 
 
 class TestThing(unittest.TestCase):
-    def _createTestTable(self):
+    def setUp(self):
+        self.mocks = [mock_dynamodb2(), mock_sns(), mock_stepfunctions(), mock_iam()]
+        [mock.start() for mock in self.mocks]
+        roleName = 'serverless-game-prod-StepFunctionsServiceRole-RANDOM'
         boto3.resource('dynamodb').create_table(
             TableName=environ['testing'],
             KeySchema=[
@@ -24,64 +27,71 @@ class TestThing(unittest.TestCase):
                 {'AttributeName': 'uuid', 'AttributeType': 'S'}
             ]
         )
-
-    def _createTestSNS(self):
         environ['THING_TOPIC_ARN'] = boto3.resource('sns').create_topic(Name='ThingTopic').arn
-
-    def _createTestSFN(self):
+        role = boto3.client('iam').create_role(
+            RoleName=roleName,
+            AssumeRolePolicyDocument="""
+Version: "2012-10-17"
+    Statement:
+    -
+        Sid: "AllowStepFunctionsServiceToAssumeRole"
+        Effect: "Allow"
+        Action:
+        - "sts:AssumeRole"
+        Principal:
+        Service: "states.${AWS::Region}.amazonaws.com"
+        """
+        )
         boto3.client('stepfunctions').create_state_machine(
             name='test',
             definition="""
                 {
-                "StartAt": "Delay",
-                "Comment": "Publish to SNS with delay",
-                "States": {
-                "Delay": {
-                    "Type": "Wait",
-                    "SecondsPath": "$.delay_seconds",
-                    "Next": "Publish to SNS"
-                },
-                "Publish to SNS": {
-                    "Type": "Task",
-                    "Resource": "arn:aws:states:::sns:publish",
-                    "Parameters": {
-                    "TopicArn": "arn:aws:sns:ap-southeast-1:1234567890:ThingTopicName",
-                    "Message.$": "$.data",
-                    "MessageAttributes": {
-                        "aspect": {
-                        "DataType": "String",
-                        "StringValue": "$.data.aspect"
+                    "StartAt": "Delay",
+                    "Comment": "Publish to SNS with delay",
+                    "States": {
+                        "Delay": {
+                            "Type": "Wait",
+                            "SecondsPath": "$.delay_seconds",
+                            "Next": "Publish to SNS"
+                        },
+                        "Publish to SNS": {
+                            "Type": "Task",
+                            "Resource": "arn:aws:states:::sns:publish",
+                            "Parameters": {
+                                "TopicArn": "arn:aws:sns:ap-southeast-1:1234567890:ThingTopicName",
+                                "Message.$": "$.data",
+                                "MessageAttributes": {
+                                    "aspect": {
+                                        "DataType": "String",
+                                        "StringValue": "$.data.aspect"
+                                    }
+                                }
+                            },
+                            "End": true
                         }
                     }
-                    },
-                    "End": true
                 }
-                }
-            }
-          """,
-            roleArn='arn:aws:iam::1234567890:role/serverless-game-prod/serverless-game-prod-StepFunctionsServiceRole-RANDOMSTUFF'
+            """,
+            roleArn=role['Role']['Arn']
         )
+
+    def tearDown(self):
+        [mock.stop() for mock in self.mocks]
 
     def test_fail_no_tablename(self):
         with self.assertRaises(AssertionError):
             thing.Thing()
 
-    @mock_dynamodb2
     def test_keyerror_on_load_nonexistent(self):
-        self._createTestTable()
         with self.assertRaises(KeyError):
             ThingTestClass('uuid', 'tid')
 
-    @mock_dynamodb2
     def test_create(self):
-        self._createTestTable()
         t = ThingTestClass('', 'tid')
         self.assertEqual(t.tid, 'tid')
         self.assertNotEqual(t.uuid, '')
 
-    @mock_dynamodb2
     def test_load(self):
-        self._createTestTable()
         t = ThingTestClass('', 'tid')
         uuid = t.uuid
         del(t)
@@ -89,18 +99,13 @@ class TestThing(unittest.TestCase):
         self.assertEqual(t.tid, 'tid2')
         self.assertEqual(t.uuid, uuid)
 
-    @mock_dynamodb2
     def test_destroy(self):
-        self._createTestTable()
         t = ThingTestClass('', 'tid')
         uuid = t.uuid
         t.destroy()
         with self.assertRaises(KeyError):
             t = ThingTestClass(uuid, 'tid2')
 
-    # @mock_dynamodb2
-    # @mock_stepfunctions
-    # @mock_iam
     # def test_tick(self):
     #     self._createTestTable()
     #     self._createTestSFN()
@@ -108,17 +113,13 @@ class TestThing(unittest.TestCase):
     #     t.tick()
     #     # TODO: Check that it self-scheduled
 
-    @mock_dynamodb2
     def test_prohibited_sets(self):
-        self._createTestTable()
         t = ThingTestClass('', 'tid')
         with self.assertRaises(AttributeError):
             t.tid = 'test'
             t.uuid = 'test'
 
-    @mock_dynamodb2
     def test_aspectName(self):
-        self._createTestTable()
         t = ThingTestClass('', 'tid')
         self.assertEqual(t.aspectName, 'ThingTestClass')
 

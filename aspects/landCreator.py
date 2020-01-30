@@ -1,5 +1,5 @@
-from handler import lambdaHandler
-from location import Location
+from aspects.handler import lambdaHandler
+from aspects.location import Location
 import random
 import logging
 
