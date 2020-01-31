@@ -271,6 +271,9 @@ resources:
                 KeyType: RANGE
             Projection:
               ProjectionType: KEYS
+            ProvisionedThroughput:
+              ReadCapacityUnits: 1
+              WriteCapacityUnits: 1
           -
             IndexName: "cartesian"
             KeySchema:
