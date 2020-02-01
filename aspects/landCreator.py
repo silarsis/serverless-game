@@ -1,6 +1,7 @@
 from aspects.handler import lambdaHandler
 from aspects.location import Location
 from aspects.land import Land
+from aspects.thing import callable
 import random
 import logging
 
