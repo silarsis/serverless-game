@@ -65,7 +65,7 @@ functions:
         - aspects/**
     events:
       - sns:
-          arn: !Ref ThingTopic
+          arn: "arn:aws:sns:#{AWS::Region}:#{AWS::AccountId}:${self:custom.topics.thingName}"
 
   location:
     handler: aspects/location.handler
@@ -79,7 +79,7 @@ functions:
         - aspects/**
     events:
       - sns:
-          arn: !Ref ThingTopic
+          arn: "arn:aws:sns:#{AWS::Region}:#{AWS::AccountId}:${self:custom.topics.thingName}"
           filterPolicy:
             aspect:
               - Location
@@ -96,7 +96,7 @@ functions:
         - aspects/**
     events:
       - sns:
-          arn: !Ref ThingTopic
+          arn: "arn:aws:sns:#{AWS::Region}:#{AWS::AccountId}:${self:custom.topics.thingName}"
           filterPolicy:
             aspect:
               - Land
@@ -113,7 +113,7 @@ functions:
         - aspects/**
     events:
       - sns:
-          arn: !Ref ThingTopic
+          arn: "arn:aws:sns:#{AWS::Region}:#{AWS::AccountId}:${self:custom.topics.thingName}"
           filterPolicy:
             aspect:
               - LandCreator
