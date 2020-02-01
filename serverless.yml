@@ -292,3 +292,8 @@ resources:
           ReadCapacityUnits: 1
           WriteCapacityUnits: 1
         TableName: ${self:custom.tables.landName}
+  Outputs:
+    ThingTopic:
+      Value: !Ref ThingTopic
+      Export:
+        Name: ${self:provider.stage}-ThingTopic

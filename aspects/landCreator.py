@@ -12,6 +12,7 @@ class LandCreator(Location):
         loc_uuid = Land.by_coordinates((0, 0, 0))
         super().create()
         self.location = loc_uuid
+        self.tick()
 
     @callable
     def tick(self):
