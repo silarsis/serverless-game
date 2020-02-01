@@ -6,6 +6,7 @@ from typing import Tuple
 import boto3
 from boto3.dynamodb.conditions import Key
 from os import environ
+import ast
 
 CoordType = Tuple[int, int, int]
 
@@ -13,24 +14,29 @@ CoordType = Tuple[int, int, int]
 class Land(Location):
     _tableName = 'LAND_TABLE'
 
+    @classmethod
+    def _convertCoordinatesForStorage(cls, value: CoordType) -> str:
+        assert(isinstance(value, tuple))
+        assert(len(value) == 3)
+        assert(all([isinstance(item, int) for item in value]))
+        return str(value)
+
     @property
     def coordinates(self):
-        return tuple([int(i) for i in self.data['coordinates']])
+        return ast.literal_eval(self.data['coordinates'])
 
     @coordinates.setter
     def coordinates(self, value: CoordType):
-        assert(isinstance(value, tuple))
-        assert(len(value) == 3)
-        self.data['coordinates'] = list(value)
+        self.data['coordinates'] = self._convertCoordinatesForStorage(value)
         self._save()
 
     @classmethod
     def by_coordinates(cls, coordinates: CoordType) -> IdType:
-        assert(isinstance(coordinates, tuple))
+        coords = cls._convertCoordinatesForStorage(coordinates)
         queryResults = boto3.resource('dynamodb').Table(environ[cls._tableName]).query(
             IndexName='cartesian',
             Select='ALL_PROJECTED_ATTRIBUTES',
-            KeyConditionExpression=Key('coordinates').eq(list(coordinates))
+            KeyConditionExpression=Key('coordinates').eq(coords)
         )
         if queryResults['Items']:
             return queryResults['Items'][0]['uuid']

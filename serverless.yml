@@ -254,7 +254,7 @@ resources:
             AttributeType: S
           -
             AttributeName: coordinates
-            AttributeType: L
+            AttributeType: S
         KeySchema:
           -
             AttributeName: uuid

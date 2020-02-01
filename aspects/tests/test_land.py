@@ -24,7 +24,7 @@ class TestLand(unittest.TestCase):
                 },
                 {
                     'AttributeName': 'coordinates',
-                    'AttributeType': 'L'
+                    'AttributeType': 'S'
                 }
             ],
             TableName=environ['LAND_TABLE'],
