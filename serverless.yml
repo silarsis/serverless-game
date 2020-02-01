@@ -270,7 +270,7 @@ resources:
                 AttributeName: uuid
                 KeyType: RANGE
             Projection:
-              ProjectionType: KEYS
+              ProjectionType: KEYS_ONLY
             ProvisionedThroughput:
               ReadCapacityUnits: 1
               WriteCapacityUnits: 1
