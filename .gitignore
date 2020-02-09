@@ -15,7 +15,7 @@ var/
 *.egg-info/
 .installed.cfg
 *.egg
-.tox/
+**.tox/
 .mypy_cache/
 .pytest_cache/
 **__pycache__/
