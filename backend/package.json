@@ -1,7 +1,7 @@
 {
-  "name": "serverless-game",
+  "name": "serverless-game-backend",
   "version": "1.0.0",
-  "description": "Toy game world with events and lambdas",
+  "description": "Eventing backbone for the serverless game",
   "main": "index.js",
   "directories": {
     "lib": "lib"

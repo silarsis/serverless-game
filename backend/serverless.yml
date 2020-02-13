@@ -6,6 +6,7 @@ org: silarsis
 plugins:
   - serverless-pseudo-parameters
   - serverless-python-requirements
+
 custom:
   pythonRequirements:
     pythonBin: python3
