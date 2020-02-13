@@ -1,0 +1,30 @@
+{
+  "name": "serverless-game-frontend",
+  "version": "1.0.0",
+  "description": "static website (angular) for the serverless game",
+  "main": "index.js",
+  "directories": {
+    "lib": "lib"
+  },
+  "scripts": {
+    "test": "python -m pip install -r test_requirements.txt && AWS_DEFAULT_REGION=ap-southeast-1 python -m unittest discover ."
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/silarsis/serverless-game.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/silarsis/serverless-game/issues"
+  },
+  "homepage": "https://github.com/silarsis/serverless-game#readme",
+  "dependencies": {
+    "serverless": "^1.62.0",
+    "serverless-finch": "^2.5.2",
+    "serverless-pseudo-parameters": "^2.5.0"
+  },
+  "devDependencies": {
+    "serverless-python-requirements": "^5.0.1"
+  }
+}

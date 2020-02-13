@@ -1,0 +1,41 @@
+service: serverless-game-frontend
+app: serverless-game
+org: silarsis
+
+plugins:
+    - serverless-finch
+
+custom:
+    pythonRequirements:
+        pythonBin: python3
+    defaultRegion: ap-southeast-1
+    client:
+        bucketName: serverless-game-${self:provider.stage}
+
+provider:
+    name: aws
+    runtime: python3.8
+    memorySize: 128
+    tracing:
+        lambda: true
+    region: ${opt:region, self:custom.defaultRegion}
+
+resources:
+    StaticContentBucket:
+        Type: AWS::S3::Bucket
+        Name: ${self:custom.client.bucketName}
+        Properties:
+        # Set the CORS policy
+        CorsConfiguration:
+            CorsRules:
+            -
+                AllowedOrigins:
+                - '*'
+                AllowedHeaders:
+                - '*'
+                AllowedMethods:
+                - GET
+                - PUT
+                - POST
+                - DELETE
+                - HEAD
