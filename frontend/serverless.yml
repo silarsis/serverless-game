@@ -10,7 +10,7 @@ custom:
         pythonBin: python3
     defaultRegion: ap-southeast-1
     client:
-        bucketName: serverless-game-${self:provider.stage}
+        bucketName: serverless-game-${self:provider.stage}.bofh.net.au
 
 provider:
     name: aws
