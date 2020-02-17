@@ -1,7 +1,7 @@
-from aspects.handler import lambdaHandler
-from aspects.location import Location
-from aspects.land import Land
-from aspects.thing import callable
+from .handler import lambdaHandler
+from .location import Location
+from .land import Land
+from .thing import callable
 import random
 import logging
 

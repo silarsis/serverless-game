@@ -1,7 +1,7 @@
 # Land is locations on a grid with some terrain
 
-from aspects.location import Location, ExitsType
-from aspects.thing import IdType, callable
+from .location import Location, ExitsType
+from .thing import IdType, callable
 from typing import Tuple
 import boto3
 from boto3.dynamodb.conditions import Key
