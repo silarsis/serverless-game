@@ -21,22 +21,23 @@ provider:
     region: ${opt:region, self:custom.defaultRegion}
 
 resources:
-    StaticContentBucket:
-        Type: AWS::S3::Bucket
-        Properties:
-            Name: ${self:custom.client.bucketName}
-            AccessControl: Private
-            # Set the CORS policy
-            CorsConfiguration:
-                CorsRules:
-                -
-                    AllowedOrigins:
-                    - '*'
-                    AllowedHeaders:
-                    - '*'
-                    AllowedMethods:
-                    - GET
-                    - PUT
-                    - POST
-                    - DELETE
-                    - HEAD
+    Resources:
+        StaticContentBucket:
+            Type: AWS::S3::Bucket
+            Properties:
+                Name: ${self:custom.client.bucketName}
+                AccessControl: Private
+                # Set the CORS policy
+                CorsConfiguration:
+                    CorsRules:
+                    -
+                        AllowedOrigins:
+                        - '*'
+                        AllowedHeaders:
+                        - '*'
+                        AllowedMethods:
+                        - GET
+                        - PUT
+                        - POST
+                        - DELETE
+                        - HEAD
