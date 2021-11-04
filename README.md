@@ -196,4 +196,7 @@ step functions for delayed messages.
 To set this up on a fresh machine for local development, do the following:
 
 * Check out the code
-* 
+* Install nvm-windows from https://github.com/coreybutler/nvm-windows
+* Run `nvm on` and `nvm install latest` in the frontend directory
+* As admin, run `nvm use latest` in the frontend directory
+* Run `npm install` and `npm upgrade` in the frontend directory
