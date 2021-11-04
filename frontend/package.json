@@ -22,7 +22,8 @@
   "dependencies": {
     "serverless": "^1.62.0",
     "serverless-finch": "^2.5.2",
-    "serverless-pseudo-parameters": "^2.5.0"
+    "serverless-pseudo-parameters": "^2.5.0",
+    "serverless-single-page-app-plugin": "^1.0.4"
   },
   "devDependencies": {
     "serverless-python-requirements": "^5.0.1"
