@@ -2,7 +2,7 @@
 
 Toy game world with events and lambdas
 
-Design Thoughts:
+## Design Thoughts
 
 Rather than an object hierarchy, I want to use aspects. However, I think the
 aspects should be lambdas in their own right. So, the idea is that an event
@@ -51,8 +51,7 @@ it. If you want to get information about another entity, you throw an event
 that triggers an action on that entity and also provides a callback for the
 method to go to once that data is there.
 
-The above raises a series of challenges if it's done for all inter-object
-comms:
+The above raises a series of challenges if it's done for all inter-object communications:
 
 * How do we do aggregation?
 * How do we manipulate return values in the chain so we can map from call to call?
@@ -62,6 +61,8 @@ So, in the meantime we've also got an ability to instantiate other objects and
 aspects locally. Once I've figured out solutions for the above, I may come back and
 convert everything to callback, not sure. At least, there needs to be events when
 things change.
+
+(Thought: could I do callbacks as yields?)
 
 ## Example Event Streams
 
@@ -189,3 +190,10 @@ Note you can embed arbitrarily deep callbacks in the callback structure.
 
 Note also there's a 32Kb limit on packet size because it may go through
 step functions for delayed messages.
+
+## Setup
+
+To set this up on a fresh machine for local development, do the following:
+
+* Check out the code
+* 

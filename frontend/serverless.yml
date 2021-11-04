@@ -29,10 +29,10 @@ resources:
             Properties:
                 BucketName: ${self:custom.client.bucketName}
                 AccessControl: PublicRead
-                WesiteConfiguration:
+                WebsiteConfiguration:
                     IndexDocument: index.html
                     ErrorDocument: error.html
-                    ## Specifying the policies to make sure all files inside the Bucket are avaialble to CloudFront
+                    ## Specifying the policies to make sure all files inside the Bucket are available to CloudFront
         StaticContentBucketPolicy:
             Type: AWS::S3::BucketPolicy
             Properties:
@@ -53,7 +53,8 @@ resources:
             Properties:
                 DistributionConfig:
                     Origins:
-                        - DomainName: ${self:custom.client.bucketName}.s3.amazonaws.com
+                        - 
+                            DomainName: ${self:custom.client.bucketName}.s3.amazonaws.com
                             ## An identifier for the origin which must be unique within the distribution
                             Id: WebApp
                             CustomOriginConfig:
@@ -71,7 +72,8 @@ resources:
                     ## Since the Single Page App is taking care of the routing we need to make sure ever path is served with index.html
                     ## The only exception are files that actually exist e.h. app.js, reset.css
                     CustomErrorResponses:
-                        - ErrorCode: 404
+                        - 
+                            ErrorCode: 404
                             ResponseCode: 200
                             ResponsePagePath: /index.html
                     DefaultCacheBehavior:
