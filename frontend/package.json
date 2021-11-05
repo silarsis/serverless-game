@@ -20,12 +20,12 @@
   },
   "homepage": "https://github.com/silarsis/serverless-game#readme",
   "dependencies": {
-    "serverless": "^1.62.0",
-    "serverless-finch": "^2.5.2",
+    "serverless": "^2.65.0",
+    "serverless-finch": "^2.6.0",
     "serverless-pseudo-parameters": "^2.5.0",
     "serverless-single-page-app-plugin": "^1.0.4"
   },
   "devDependencies": {
-    "serverless-python-requirements": "^5.0.1"
+    "serverless-python-requirements": "^5.1.1"
   }
 }
