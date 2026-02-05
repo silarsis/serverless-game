@@ -1,4 +1,5 @@
 """Tests for Thing aspect module."""
+
 import unittest
 from os import environ
 

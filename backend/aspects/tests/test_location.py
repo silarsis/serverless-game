@@ -1,4 +1,5 @@
 """Tests for Location aspect module."""
+
 import unittest
 from os import environ
 
