@@ -1,4 +1,4 @@
-# Land is locations on a grid with some terrain
+"""Land is locations on a grid with some terrain."""
 
 import ast
 from typing import Tuple
@@ -13,31 +13,57 @@ CoordType = Tuple[int, int, int]
 
 
 class Land(Location):
+    """A location on a grid, represented by coordinates and some terrain."""
+
     _tableName = "LAND_TABLE"
 
     @classmethod
     def _convertCoordinatesForStorage(cls, value: CoordType) -> str:
+        """Convert a tuple of coordinates to a string for storage.
+
+        Args:
+            value: A tuple of three integers representing the coordinates.
+        Returns:
+            String representation of coordinates.
+        """
         assert isinstance(value, tuple)
         assert len(value) == 3
-        assert all([isinstance(item, int) for item in value])
+        assert all(isinstance(item, int) for item in value)
         return str(value)
 
     @property
     def coordinates(self):
+        """Retrieve the coordinates from the data property."""
         return ast.literal_eval(self.data["coordinates"])
 
     @coordinates.setter
     def coordinates(self, value: CoordType):
+        """Set the coordinates property and save the data.
+
+        Args:
+            value: A tuple of three integers representing the coordinates.
+        """
         self.data["coordinates"] = self._convertCoordinatesForStorage(value)
         self._save()
 
     @classmethod
     def by_coordinates(cls, coordinates: CoordType) -> IdType:
-        coords = cls._convertCoordinatesForStorage(coordinates)
-        queryResults = get_dynamodb_table(cls._tableName).query(
+        """Get or create land at the given coordinates.
+
+        Args:
+            coordinates: Tuple of (x, y, z) coordinates.
+        Returns:
+            UUID of the land at those coordinates.
+        """
+        coords_str = cls._convertCoordinatesForStorage(coordinates)
+        key_condition = Key("coordinates").eq(
+            coords_str
+        )
+        table = get_dynamodb_table(cls._tableName)
+        queryResults = table.query(
             IndexName="cartesian",
             Select="ALL_PROJECTED_ATTRIBUTES",
-            KeyConditionExpression=Key("coordinates").eq(coords),
+            KeyConditionExpression=key_condition,
         )
         if queryResults["Items"]:
             return queryResults["Items"][0]["uuid"]
@@ -46,31 +72,66 @@ class Land(Location):
         return land.uuid
 
     @classmethod
-    def _new_coords_by_direction(cls, coordinates: CoordType, direction: str) -> CoordType:
+    def _new_coords_by_direction(
+        cls, coordinates: CoordType, direction: str
+    ) -> CoordType:
+        """Compute new coordinates by moving in the given direction.
+
+        Args:
+            coordinates: Current (x, y, z) coordinates.
+            direction: Direction to move (e.g., 'north', 'south').
+        Returns:
+            New (x, y, z) coordinates after moving in the given direction.
+        """
         exits = ["north", "south", "west", "east", "up", "down"]
         assert direction in exits
-        new_coord = coordinates
+        x, y, z = coordinates
         if direction == "north":
-            new_coord = (coordinates[0], coordinates[1] + 1, coordinates[2])
-        elif direction == "south":
-            new_coord = (coordinates[0], coordinates[1] - 1, coordinates[2])
-        elif direction == "west":
-            new_coord = (coordinates[0] - 1, coordinates[1], coordinates[2])
-        elif direction == "east":
-            new_coord = (coordinates[0] + 1, coordinates[1], coordinates[2])
-        elif direction == "up":
-            new_coord = (coordinates[0], coordinates[1], coordinates[2] + 1)
-        elif direction == "down":
-            new_coord = (coordinates[0], coordinates[1], coordinates[2] - 1)
-        return new_coord
+            return (x, y + 1, z)
+        if direction == "south":
+            return (x, y - 1, z)
+        if direction == "west":
+            return (x - 1, y, z)
+        if direction == "east":
+            return (x + 1, y, z)
+        if direction == "up":
+            return (x, y, z + 1)
+        if direction == "down":
+            return (x, y, z - 1)
+        return coordinates
 
     def by_direction(self, direction: str) -> IdType:
-        new_coord = Land._new_coords_by_direction(self.coordinates, direction)
-        return self.by_coordinates(new_coord)
+        """Get the land ID in the given direction from this location.
+
+        Args:
+            direction: The direction to move in.
+        Returns:
+            UUID of the land in that direction.
+        """
+        new_coord = Land._new_coords_by_direction(
+            self.coordinates,
+            direction
+        )
+        land_id = self.by_coordinates(new_coord)
+        return land_id
 
     @callable
-    def add_exit(self, direction: str, destination: IdType) -> ExitsType:
-        if not destination:
-            new_coord = self._new_coords_by_direction(self.coordinates, direction)
-            destination = Land.by_coordinates(new_coord)
-        return super().add_exit(direction, destination)
+    def add_exit(self, d: str, dest: IdType) -> ExitsType:
+        """Add an exit in the given direction, creating a new land if necessary.
+
+        Args:
+            d: The direction for the exit.
+            dest: The destination UUID or None to create one.
+        Returns:
+            Updated exits dictionary.
+        """
+        if not dest:
+            new_coord = self._new_coords_by_direction(
+                self.coordinates, d
+            )
+            dest = Land.by_coordinates(new_coord)
+        result = super().add_exit(
+            d,
+            dest
+        )
+        return result
