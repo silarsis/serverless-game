@@ -25,14 +25,11 @@ def lambdaHandler(objectClass):
     Returns:
         function: Handler suitable for AWS Lambda SNS events.
     """
+
     def handler(event: dict, context: dict):
         """Process an AWS Lambda event and invoke action on objectClass for each SNS message."""
         logging.info(json.dumps(event, indent=2))
         for e in event["Records"]:
-            objectClass._action(
-                json.loads(
-                    e["Sns"]["Message"]
-                )
-            )
+            objectClass._action(json.loads(e["Sns"]["Message"]))
 
     return handler
