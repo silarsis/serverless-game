@@ -16,15 +16,15 @@ class Thing(UserDict):
     @property
     def connection_id(self) -> Optional[str]:
         """Get the WebSocket connection ID if connected, else None."""
-        return self.data.get("connection_id")
+        return self.data.get("connection_id")  # type: ignore
 
     @connection_id.setter
     def connection_id(self, value: Optional[str]) -> None:
         """Set or clear the WebSocket connection ID."""
         if value:
-            self.data["connection_id"] = value
+            self.data["connection_id"] = value  # type: ignore
         else:
-            self.data.pop("connection_id", None)
+            self.data.pop("connection_id", None)  # type: ignore
         self._save()
 
     def push_event(self, event: dict) -> None:
@@ -36,7 +36,7 @@ class Thing(UserDict):
         try:
             api_gateway = get_api_gateway_client()
             api_gateway.post_to_connection(
-                ConnectionId=self.connection_id,
+                ConnectionId=self.connection_id,  # type: ignore
                 Data=json.dumps(event, cls=DecimalEncoder),
             )
         except ClientError as e:
@@ -49,13 +49,13 @@ class Thing(UserDict):
     @callable
     def attach_connection(self, connection_id: str) -> dict:
         """Attach a WebSocket connection to this entity."""
-        self.connection_id = connection_id
+        self.connection_id = connection_id  # type: ignore
         return {"status": "connected", "entity_uuid": self.uuid}
 
     @callable
     def detach_connection(self) -> dict:
         """Detach the WebSocket connection from this entity."""
-        self.connection_id = None
+        self.connection_id = None  # type: ignore
         return {"status": "disconnected", "entity_uuid": self.uuid}
 
     @callable
@@ -63,7 +63,7 @@ class Thing(UserDict):
         """Route a received command from WebSocket to a callable method, if defined."""
         method = getattr(self, command, None)
         if method and callable(method) and hasattr(method, "_is_callable"):
-            return method(**kwargs)
+            return method(**kwargs)  # type: ignore
         return {"error": f"Unknown command: {command}"}
 
 
