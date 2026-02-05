@@ -255,10 +255,53 @@ Always routed through SNS to preserve the event architecture. Never direct Lambd
 ## TODO / Current Work
 
 ### Immediate (Next Session)
+- [ ] **User Registration System** — Email/password signup with verification
+  - Design: See docs/REQUIREMENTS.md, docs/AUTH_DESIGN.md, docs/EMAIL_DESIGN.md
+  - Create `users` DynamoDB table (email PK, password hash, entity assignment)
+  - Implement registration API (email validation, password hashing)
+  - Implement verification flow (token generation, email sending)
+  - Auto-create Player entity on successful verification
+  - See open questions in docs/REQUIREMENTS.md for Kevin's decisions
+- [ ] **Authentication System** — Login/logout with JWT
+  - Password validation against bcrypt/argon2 hash
+  - JWT generation with claims: sub, email, entity_uuid, entity_aspect
+  - WebSocket auth with JWT in header
+  - Implement `possess` for returning users (look up entity from user record)
+- [ ] **Email Service Setup** — Choose and configure email delivery
+  - Options: AWS SES, SendGrid, SMTP relay
+  - Implement email templates for verification
+  - Handle bounces/failures
 - [ ] Test WebSocket end-to-end with real client
-- [ ] Implement `possess` for new player entities (auto-create player if JWT is new)
 - [ ] Add keepalive/ping to prevent 2-hour timeout
-- [ ] Write AI agent SDK skeleton
+
+### Near Term (This Week)
+- [ ] **Web UI — Auth Pages** — Signup, login, verification
+  - Landing page with game description
+  - Signup form (email, password, confirm)
+  - "Check your email" confirmation page
+  - Verification link handler
+  - Login form with error handling
+- [ ] **Web UI — Game Page** — `/play` interface
+  - WebSocket connection with auto-possession
+  - Event log panel (styled by event type)
+  - Sidebar: location, stats, inventory
+  - Command input with history
+  - Quick action buttons
+- [ ] **Agent-Friendly REST API** — For programmatic access
+  - POST /api/auth/register, /verify, /login
+  - GET /api/player/me, /location, /inventory
+  - POST /api/command
+  - Document in API_SPEC.md
+- [ ] Add tests for `websocket_handlers.py`
+- [ ] Create example web client (vanilla JS)
+- [ ] Stress test: 100 concurrent connections
+
+### Medium Term (This Month)
+- [ ] **Agent SDK** — Python package for bot development
+  - Agent class with WebSocket/REST support
+  - Event handling framework
+  - Command builders
+  - Example bot implementations
 
 ### Near Term (This Week)
 - [ ] Add tests for `websocket_handlers.py`
