@@ -206,4 +206,30 @@ serverless-game/
 
 ---
 
+## Deferred Items / Known Issues
+
+Issues identified during review that are intentionally deferred until later:
+
+### JWT Refresh / Revocation / Re-authentication
+- **Issue:** No JWT refresh strategy, revocation mechanism, or re-authentication on WebSocket connections. Stale sessions could theoretically be hijacked.
+- **Status:** Pending — to be fixed when we get closer to release and implement proper OAuth.
+- **Notes:** Current JWT implementation is sufficient for development. Production will need full OAuth flow with refresh tokens.
+
+### SNS Single Point of Failure
+- **Issue:** Event bus relies entirely on SNS without fallback mechanisms. If SNS fails, the game stops.
+- **Status:** Acceptable for now.
+- **Notes:** SNS has 99.9% SLA. For a game at this scale, acceptable. Future: consider event bus abstraction with fallback (Kinesis, EventBridge, or local queue).
+
+### @admin_only Privilege Escalation Risk
+- **Issue:** The `@admin_only` decorator validates `is_admin` flag but doesn't cryptographically verify admin status. A compromised entity could potentially set `is_admin=True`.
+- **Status:** Documented — to be considered later.
+- **Notes:** Current model: only system entities can have `is_admin=True`, and system entities cannot be possessed. This is defense-in-depth but not cryptographically strong. Future: JWT claims with admin scope, signed by authority.
+
+### Automated Entity Retirement / Cleanup
+- **Issue:** No mechanism to clean up "ghost" entities (disconnected, abandoned, or temporary). Over time this could lead to storage bloat.
+- **Status:** To be considered later when things start getting too big.
+- **Notes:** Not needed now. When scale demands it: implement TTL on DynamoDB items with `last_activity` timestamp, or periodic garbage collection Lambda.
+
+---
+
 *Last updated: 2026-02-05*
