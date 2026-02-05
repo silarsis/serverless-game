@@ -4,7 +4,9 @@ import json
 import logging
 from collections import UserDict
 from typing import Optional
+
 from botocore.exceptions import ClientError
+
 from aspects.aws_client import get_api_gateway_client
 
 
