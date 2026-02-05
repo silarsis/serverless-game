@@ -64,9 +64,7 @@ def command_handler(event: dict, context: dict) -> dict:
     if not entity_info:
         return {
             "statusCode": 403,
-            "body": json.dumps(
-                {"error": "Not possessing any entity. Send 'possess' first."}
-            ),
+            "body": json.dumps({"error": "Not possessing any entity. Send 'possess' first."}),
         }
 
     # Route command to entity via SNS
@@ -91,9 +89,7 @@ def _handle_possess(connection_id: str, data: dict) -> dict:
     if not entity_uuid or not entity_aspect:
         return {
             "statusCode": 400,
-            "body": json.dumps(
-                {"error": "possess requires entity_uuid and entity_aspect"}
-            ),
+            "body": json.dumps({"error": "possess requires entity_uuid and entity_aspect"}),
         }
 
     # First, detach this connection from any existing entity

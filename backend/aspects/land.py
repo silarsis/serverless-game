@@ -46,9 +46,7 @@ class Land(Location):
         return land.uuid
 
     @classmethod
-    def _new_coords_by_direction(
-        cls, coordinates: CoordType, direction: str
-    ) -> CoordType:
+    def _new_coords_by_direction(cls, coordinates: CoordType, direction: str) -> CoordType:
         exits = ["north", "south", "west", "east", "up", "down"]
         assert direction in exits
         new_coord = coordinates

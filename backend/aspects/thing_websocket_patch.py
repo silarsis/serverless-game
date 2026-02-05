@@ -96,9 +96,7 @@ class Location(Thing):
         self.location = destination
 
         # Broadcast to world via SNS (existing pattern)
-        self.call(
-            self.uuid, "Location", "notify_move", old=old_location, new=destination
-        ).now()
+        self.call(self.uuid, "Location", "notify_move", old=old_location, new=destination).now()
 
         # Push directly to connected player (NEW)
         self.push_event(

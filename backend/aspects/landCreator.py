@@ -37,9 +37,7 @@ class LandCreator(Location):
             new_loc = Land(uuid=loc.by_direction(chosen_exit))
             new_loc.add_exit(directions[chosen_exit], loc.uuid)
             loc.add_exit(chosen_exit, new_loc.uuid)
-            logging.info(
-                "I created a new piece of land, {} of here".format(chosen_exit)
-            )
+            logging.info("I created a new piece of land, {} of here".format(chosen_exit))
         self.schedule_next_tick()
 
 
