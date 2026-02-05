@@ -1,12 +1,11 @@
 # Land is locations on a grid with some terrain
 
 import ast
-from os import environ
 from typing import Tuple
 
-import boto3
 from boto3.dynamodb.conditions import Key
 
+from .aws_client import get_dynamodb_table
 from .location import ExitsType, Location
 from .thing import IdType, callable
 
@@ -35,14 +34,10 @@ class Land(Location):
     @classmethod
     def by_coordinates(cls, coordinates: CoordType) -> IdType:
         coords = cls._convertCoordinatesForStorage(coordinates)
-        queryResults = (
-            boto3.resource("dynamodb")
-            .Table(environ[cls._tableName])
-            .query(
-                IndexName="cartesian",
-                Select="ALL_PROJECTED_ATTRIBUTES",
-                KeyConditionExpression=Key("coordinates").eq(coords),
-            )
+        queryResults = get_dynamodb_table(cls._tableName).query(
+            IndexName="cartesian",
+            Select="ALL_PROJECTED_ATTRIBUTES",
+            KeyConditionExpression=Key("coordinates").eq(coords),
         )
         if queryResults["Items"]:
             return queryResults["Items"][0]["uuid"]

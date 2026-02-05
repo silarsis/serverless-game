@@ -7,7 +7,11 @@ from os import environ
 from typing import Any, Dict
 from uuid import uuid4
 
-import boto3
+from aspects.aws_client import (
+    get_dynamodb_table,
+    get_sns_topic,
+    get_stepfunctions_client,
+)
 
 EventType = Dict[str, Any]  # Actually needs to be json-able
 IdType = str  # This is a UUID cast to a str, but I want to identify it for typing purposes
@@ -61,7 +65,7 @@ class Call(UserDict):
         return self
 
     def now(self) -> None:
-        sns = boto3.resource("sns").Topic(environ["THING_TOPIC_ARN"])
+        sns = get_sns_topic("THING_TOPIC_ARN")
         logging.info(self.data)
         return sns.publish(
             Message=json.dumps(self.data, cls=DecimalEncoder),
@@ -73,7 +77,7 @@ class Call(UserDict):
         )
 
     def after(self, seconds: int = 0) -> None:
-        sfn = boto3.client("stepfunctions")
+        sfn = get_stepfunctions_client()
         return sfn.start_execution(
             stateMachineArn=environ["MESSAGE_DELAYER_ARN"],
             input=json.dumps({"delay_seconds": seconds, "data": self.data}, cls=DecimalEncoder),
@@ -127,7 +131,7 @@ class Thing(UserDict):
 
     @property
     def _table(self):
-        return boto3.resource("dynamodb").Table(environ[self._tableName])
+        return get_dynamodb_table(self._tableName)
 
     @callable
     def create(self) -> None:
@@ -214,7 +218,7 @@ class Thing(UserDict):
     def _sendEvent(self, event: EventType) -> str:
         sendEvent: Dict = {"default": "", "tid": self.tid, "actor_uuid": self.data["uuid"]}
         sendEvent.update(event or {})
-        topic = boto3.resource("sns").Topic(environ["THING_TOPIC_ARN"])
+        topic = get_sns_topic("THING_TOPIC_ARN")
         return topic.publish(Message=json.dumps(sendEvent), MessageStructure="json")
 
     def call(self, uuid: IdType, aspect: str, action: str, **kwargs):

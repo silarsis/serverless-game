@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  localstack:
+    image: localstack/localstack:latest
+    container_name: serverless-game-localstack
+    ports:
+      - "4566:4566"            # LocalStack Gateway
+      - "4510-4559:4510-4559"  # External services port range
+    environment:
+      - DEBUG=1
+      - LAMBDA_EXECUTOR=docker-reuse
+      - LAMBDA_REMOTE_DOCKER=false
+      - LAMBDA_REMOVE_CONTAINERS=true
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - AWS_DEFAULT_REGION=ap-southeast-1
+      - SERVICES=dynamodb,sns,lambda,stepfunctions,iam,logs,events,apigateway
+      - LS_LOG=warn
+    volumes:
+      - "${LOCALSTACK_VOLUME_DIR:-./.localstack}:/var/lib/localstack"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "./scripts/localstack-init.sh:/etc/localstack/init/ready.d/init-aws.sh"
+    networks:
+      - localstack-network
+
+  # Optional: Simple web UI for LocalStack resources
+  localstack-web:
+    image: localstack/localstack:latest
+    container_name: serverless-game-localstack-web
+    ports:
+      - "8080:8080"
+    environment:
+      - LOCALSTACK_WEB_UI=1
+    networks:
+      - localstack-network
+    profiles:
+      - web
+
+networks:
+  localstack-network:
+    driver: bridge
