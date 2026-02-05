@@ -1,12 +1,10 @@
-# serverless-game
+# Serverless Game
 
-Toy game world with events and lambdas
+A toy game world built with serverless architecture using AWS Lambda, DynamoDB, and SNS.
 
-## Design Thoughts
+## Architecture
 
-Rather than an object hierarchy, I want to use aspects. However, I think the
-aspects should be lambdas in their own right. So, the idea is that an event
-is sent to the bus:
+The game uses an **aspect-oriented** design rather than traditional object hierarchy. Each aspect is a Lambda function that listens to events on an SNS topic:
 
 ```yaml
 event:
@@ -18,185 +16,189 @@ event:
     to_loc: <new location uuid>
 ```
 
-The aspects listen to the bus directly, using filters on the SNS subscribe.
-When a message is received, the entity is loaded from DynamoDB and the action
-is triggered.
+### Key Components
 
-Each aspect will have it's own table of data - so all the data and methods for
-a given object are actually spread across multiple databases and aspects, all
-of which only care about their own concerns. They're tied together by uuid. This
-saves from collisions between aspects on data names.
+- **Aspects**: Lambda functions that handle specific concerns (location, land, etc.)
+- **Event Bus**: SNS topic for event-driven communication
+- **State Storage**: DynamoDB tables per aspect
+- **Message Delayer**: Step Functions for delayed event delivery
 
-This way, aspects can be added and removed easily - add a lambda and SNS
-subscription, and add the aspect to the appropriate objects in DynamoDB
-(or, technically, a aspect could ignore that and just fire anyway).
+## Prerequisites
 
-## Interactions
+- Python 3.11+
+- Node.js 18+
+- AWS CLI (configured with credentials)
+- Serverless Framework v3
 
-Interactions can be classified in multiple ways: with or without return value,
-information vs command, and targeted vs. non-targeted.
+## Quick Start
 
-Interactions without return values are just events - there is a helper on the
-base class that supports throwing events onto the bus, while also tracking a
-transaction ID and making default values right (`_sendEvent`). This applies
-to both information and command events, and targeted or not.
+### 1. Install Dependencies
 
-Commands or information with a response value are supported via a callback
-mechanism. There is a class (`Call`) that provides this functionality.
+```bash
+# Backend
+cd backend
+python -m pip install -r requirements-dev.txt
 
-So, if you want to change another entity, you throw an event that triggers
-an action on that entity. If you have changed your own state, you throw
-an event to indicate that, in case other entities want to do something about
-it. If you want to get information about another entity, you throw an event
-that triggers an action on that entity and also provides a callback for the
-method to go to once that data is there.
-
-The above raises a series of challenges if it's done for all inter-object communications:
-
-* How do we do aggregation?
-* How do we manipulate return values in the chain so we can map from call to call?
-* How do we make the coding not too horrific for callbacks?
-
-So, in the meantime we've also got an ability to instantiate other objects and
-aspects locally. Once I've figured out solutions for the above, I may come back and
-convert everything to callback, not sure. At least, there needs to be events when
-things change.
-
-(Thought: could I do callbacks as yields?)
-
-## Example Event Streams
-
-### Create a mob
-
-```yaml
-event:
-  aspect: mob
-  action: create
+# Frontend
+cd ../frontend
+npm install
 ```
 
-Creates a mob in the given location. Presumably there will be more details in
-the create later, once we have more details to give. For now, this is enough.
+### 2. Run Tests
 
-This will cause the following sequence of events:
-
-```yaml
-event:
-  aspect: mob
-  action: created
-  uuid: <uuid of the new entity>
+```bash
+cd backend
+pytest
 ```
 
-TODO: This is horrible. Synchronous events probably need something other than
-the event bus. Think more.
+### 3. Deploy (requires AWS credentials)
 
-```yaml
-event:
-  aspect: location
-  action: arrive
-  uuid: <mob uuid>
-  destination: <location uuid>
+```bash
+# Deploy infrastructure
+cd infra
+serverless deploy --stage prod
+
+# Deploy backend
+cd ../backend
+serverless deploy --stage prod
+
+# Deploy frontend
+cd ../frontend
+serverless client deploy --stage prod
 ```
 
-```yaml
-event:
-  aspect: movement
-  action: arrive
-  uuid: <mob uuid>
-  destination: <location uuid>
+## Development
+
+### Code Quality
+
+This project uses pre-commit hooks for code quality:
+
+```bash
+# Install pre-commit hooks
+pre-commit install
+
+# Run manually
+pre-commit run --all-files
 ```
 
-### "Say" something
+### Testing
 
-This one is interesting. The actor says something - the event with the speech
-is thrown out for anyone to listen to, but how do you know what can hear it?
+```bash
+cd backend
 
-```yaml
-event:
-  aspect: sound
-  action: say
-  uuid: <mob uuid>
-  location: <location uuid>
-  speech: <str>
+# Run all tests
+pytest
+
+# Run with coverage
+pytest --cov=aspects
+
+# Run specific test file
+pytest aspects/tests/test_thing.py
 ```
 
-## Relationships
+### Linting & Type Checking
 
-### Location
+```bash
+cd backend
 
-The Location aspect has it's own table, and stores "locations" (a list of
-IDs for other objects it is in) and "contents" (a list of IDs for objects
-that are in it). Moving requires unpicking both sides of that relationship.
-This is done for speed, although I may be able to index the table better and
-drop one side of the data.
+# Format code
+black .
+isort .
 
-## Concepts / required aspects
+# Lint
+flake8 .
 
-* Location
-* Appearance (needs location to find what's visible)
-* Sound (needs location to find what's audible)
-
-## Callbacks
-
-Say a thing wants to call a aspect, and do something with the results.
-To do this on the event bus, we really want to generate an event with
-a call to the aspect and all the data, plus callback details and data.
-Also need to include a transaction id. So if, for instance, we have a
-"loggedin" aspect that handles pretty printing what's going on to an actual
-user, and it wants to "look". It might send an event:
-
-```yaml
-event:
-  tid: <uuid of transaction>
-  uui: <uuid of location player is in>
-  aspect: location
-  action: list_contained
-  callback_data:
-    aspect: location
-    action: pretty_print
-    uuid: <uuid of player>
-    user: derrick
+# Type check
+mypy aspects/
 ```
 
-This will call the "list_contained" action, and it will send an event that
-has all the data it's meant to provide, plus the callback data, plus retaining
-the transaction id (tid).
+## CI/CD
 
-The loggedin aspect will implement a "pretty_print" action that takes that data
-and presents it back to the user (presume the "user" in callback_data is some data
-already calculated and needing to be in the return).
+This repository uses GitHub Actions for continuous integration and deployment:
 
-For this to work, we need a series of convenience methods on the underlying
-objects, for returning data in a consistent way, for packaging up callback data.
-We also introduce a callback style of coding to our aspects, unfortunately.
+- **Lint**: Runs black, isort, flake8, and mypy
+- **Test**: Runs pytest with coverage reporting
+- **Security**: Bandit security scanning
+- **Deploy**: Placeholder for Serverless deployment (requires AWS secrets)
 
-# Event Structure
+See `.github/workflows/ci.yml` for details.
+
+## Project Structure
+
+```
+serverless-game/
+├── backend/
+│   ├── aspects/          # Lambda handlers (aspects)
+│   │   ├── thing.py      # Base class for all game objects
+│   │   ├── location.py   # Location/movement aspect
+│   │   ├── land.py       # Grid-based land system
+│   │   ├── landCreator.py # Auto-generates land
+│   │   ├── eventLogger.py # Logs all events
+│   │   ├── handler.py    # Lambda handler factory
+│   │   └── tests/        # Unit tests
+│   ├── serverless.yml    # Serverless framework config
+│   ├── requirements.txt  # Production dependencies
+│   ├── requirements-dev.txt # Development dependencies
+│   └── pyproject.toml    # Tool configurations
+├── frontend/             # Web frontend
+├── infra/                # VPC and networking infrastructure
+└── .github/workflows/    # CI/CD pipelines
+```
+
+## Security
+
+### Action Validation
+
+The `Thing._action()` method validates that:
+1. Actions cannot start with `_` (private methods)
+2. Actions must be decorated with `@callable`
+3. Only explicitly allowed actions can be invoked via the event system
+
+This prevents arbitrary code execution via the event bus.
+
+## Event Structure
 
 ```yaml
 event:
-  tid: str transaction ID, mandatory
-  aspect: str name of action, mandatory
-  action: str name of action, mandatory
-  uuid: str name of "self", mandatory
-  data: {} optional
-  callback: optional
+  tid: str              # Transaction ID (mandatory)
+  aspect: str           # Aspect name (mandatory)
+  action: str           # Action name (mandatory)
+  uuid: str             # Entity UUID (mandatory)
+  data: {}              # Optional action data
+  callback:             # Optional callback
     aspect: str
     action: str
     uuid: str
     data: {}
-
 ```
 
-Note you can embed arbitrarily deep callbacks in the callback structure.
+**Note**: There's a 32KB limit on packet size due to Step Functions message delays.
 
-Note also there's a 32Kb limit on packet size because it may go through
-step functions for delayed messages.
+## Aspects
 
-## Setup
+### Location
 
-To set this up on a fresh machine for local development, do the following:
+Handles spatial positioning and movement:
+- `create`: Initialize location
+- `destroy`: Remove location (moves contents to parent)
+- `add_exit`: Create an exit in a direction
+- `remove_exit`: Remove an exit
 
-* Check out the code
-* Install nvm-windows from https://github.com/coreybutler/nvm-windows
-* Run `nvm on` and `nvm install latest` in the frontend directory
-* As admin, run `nvm use latest` in the frontend directory
-* Run `npx npm-check-updates -u` and `npm install` in the frontend directory
+### Land
+
+Grid-based land system extending Location:
+- `by_coordinates`: Get or create land at coordinates
+- `by_direction`: Get land in a direction
+- `add_exit`: Auto-creates land when exit destination is None
+
+### Thing (Base Class)
+
+All game objects inherit from Thing:
+- UUID-based identification
+- DynamoDB persistence
+- Event system integration
+- Callback mechanism for async operations
+
+## License
+
+MIT

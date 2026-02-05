@@ -1,13 +1,15 @@
-from .handler import lambdaHandler
-from .location import Location
-from .land import Land
-from .thing import callable
-import random
 import logging
+import random
+
+from .handler import lambdaHandler
+from .land import Land
+from .location import Location
+from .thing import callable
 
 
 class LandCreator(Location):
-    " This entity creates new exits and moves "
+    "This entity creates new exits and moves"
+
     @callable
     def create(self):
         loc_uuid = Land.by_coordinates((0, 0, 0))
@@ -18,12 +20,7 @@ class LandCreator(Location):
     @callable
     def tick(self):
         # Get a list of exits in the location I'm in
-        directions = {
-            'north': 'south',
-            'south': 'north',
-            'west': 'east',
-            'east': 'west'
-        }
+        directions = {"north": "south", "south": "north", "west": "east", "east": "west"}
         loc = Land(self.location, tid=self.tid)
         # Randomly pick a direction - n, s, e, w
         chosen_exit = random.choice(list(directions.keys()))
