@@ -64,8 +64,8 @@ def player_command(func: Callable) -> Callable:
         return func(self, *args, **kwargs)
 
     # Mark the method as a player-accessible command
-    wrapper._is_player_command = True
-    wrapper._is_callable = True  # Also callable internally
+    wrapper._is_player_command = True  # type: ignore[attr-defined]
+    wrapper._is_callable = True  # type: ignore[attr-defined]  # Also callable internally
 
     return wrapper
 
@@ -95,8 +95,8 @@ def admin_only(func: Callable) -> Callable:
 
         return func(self, *args, **kwargs)
 
-    wrapper._is_admin_only = True
-    wrapper._is_callable = True
+    wrapper._is_admin_only = True  # type: ignore[attr-defined]
+    wrapper._is_callable = True  # type: ignore[attr-defined]
 
     return wrapper
 
@@ -122,7 +122,7 @@ def system_entity(func: Callable) -> Callable:
         instance.is_system = True
         return instance
 
-    wrapper._is_system_entity = True
+    wrapper._is_system_entity = True  # type: ignore[attr-defined]
     return wrapper
 
 
@@ -149,5 +149,5 @@ def callable(func: Callable) -> Callable:
     def wrapper(*args, **kwargs):
         return func(*args, **kwargs)
 
-    wrapper._is_callable = True
+    wrapper._is_callable = True  # type: ignore[attr-defined]
     return wrapper
