@@ -255,35 +255,26 @@ Always routed through SNS to preserve the event architecture. Never direct Lambd
 ## TODO / Current Work
 
 ### Immediate (Next Session)
-- [ ] **User Registration System** — Email/password signup with verification
-  - Design: See docs/REQUIREMENTS.md, docs/AUTH_DESIGN.md, docs/EMAIL_DESIGN.md
-  - Create `users` DynamoDB table (email PK, password hash, entity assignment)
-  - Implement registration API (email validation, password hashing)
-  - Implement verification flow (token generation, email sending)
-  - Auto-create Player entity on successful verification (starting location: 0,0,0)
-  - Forgot password flow (request + reset)
-  - MVP: Display verification/reset codes on page (no email needed for testing)
-- [ ] **Authentication System** — Login/logout with JWT
-  - Password validation against bcrypt/argon2 hash
-  - JWT generation with claims: sub, email, entity_uuid, entity_aspect
-  - WebSocket auth with JWT in header
-  - Implement `possess` for returning users (look up entity from user record)
-- [ ] **Email Service Setup** — Choose and configure email delivery
-  - Options: AWS SES, SendGrid, SMTP relay
-  - Implement email templates for verification
-  - Handle bounces/failures
+- [x] ~~Email/Password Auth~~ — **DEPRECATED: Using Firebase Auth instead**
+  - Historical designs: docs/AUTH_DESIGN.md, docs/EMAIL_DESIGN.md
+- [ ] **Firebase Authentication** — Google Sign-In (no passwords)
+  - See docs/FIREBASE_AUTH_DESIGN.md for technical details
+  - Create Firebase project, enable Google Sign-In
+  - Create `users` DynamoDB table (firebase_uid PK, entity assignment)
+  - Implement `/api/auth/login` — verify Firebase ID token, get/create user, issue internal JWT
+  - Auto-create Player entity at (0,0,0) on first sign-in
+  - WebSocket auth with internal JWT → auto-possess entity
+  - Frontend React app with Firebase client SDK
 - [ ] Test WebSocket end-to-end with real client
 - [ ] Add keepalive/ping to prevent 2-hour timeout
 
 ### Near Term (This Week)
-- [ ] **Web UI — Auth Pages (React)** — Signup, login, verification
+- [ ] **Web UI — Auth (React + Firebase)** — Google Sign-In only
   - React app with React Router
-  - Landing page with game description
-  - Signup form (email, password, confirm)
-  - "Copy your verification code" page (MVP: display token on page)
-  - Verification code entry page
-  - Login form with error handling
-  - Forgot password flow (request + reset pages)
+  - Landing page with game description + "Sign in with Google" button
+  - Firebase Auth client SDK integration
+  - Auth state management (logged in / logged out)
+  - Automatic redirect to /play after sign-in
 - [ ] **Web UI — Game Page (React)** — `/play` interface
   - WebSocket connection with auto-possession
   - Event log panel (styled by event type)
