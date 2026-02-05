@@ -1,3 +1,4 @@
+"""Tests for Location aspect module."""
 import unittest
 from os import environ
 
@@ -11,7 +12,10 @@ environ["AWS_DEFAULT_REGION"] = "ap-southeast-1"
 
 
 class TestLocation(unittest.TestCase):
+    """Unit tests for the Location aspect."""
+
     def setUp(self):
+        """Set up mocked DynamoDB resources for testing."""
         self.mocks = [mock_dynamodb()]
         [mock.start() for mock in self.mocks]
         boto3.resource(
@@ -37,13 +41,16 @@ class TestLocation(unittest.TestCase):
         )
 
     def tearDown(self):
+        """Tear down mocked resources after testing."""
         [mock.stop() for mock in self.mocks]
 
     def test_init(self):
+        """Test initialization of Location object."""
         loc = Location()
         self.assertEqual(Location(uuid=loc.uuid).uuid, loc.uuid)
 
     def test_add_exits(self):
+        """Test adding exits to a Location object."""
         loc = Location()
         north_loc = Location()
         south_loc = Location()
@@ -54,6 +61,7 @@ class TestLocation(unittest.TestCase):
         self.assertEqual(loc.exits, {"north": north_loc.uuid, "south": south_loc.uuid})
 
     def test_remove_exits(self):
+        """Test removing exits from a Location object."""
         loc = Location()
         self.assertEqual(loc.exits, {})
         loc.remove_exit("north")
@@ -65,6 +73,7 @@ class TestLocation(unittest.TestCase):
         self.assertEqual(loc.exits, {})
 
     def test_set_location(self):
+        """Test setting the container location for a Location object."""
         loc = Location()
         container = Location()
         loc.location = container.uuid
@@ -72,6 +81,7 @@ class TestLocation(unittest.TestCase):
         self.assertEqual(container.contents, [loc.uuid])
 
     def test_reset_location(self):
+        """Test resetting the container location for a Location object."""
         loc = Location()
         first_container = Location()
         second_container = Location()

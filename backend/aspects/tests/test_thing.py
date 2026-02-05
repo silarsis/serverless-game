@@ -1,3 +1,4 @@
+"""Tests for Thing aspect module."""
 import unittest
 from os import environ
 
@@ -8,6 +9,8 @@ from aspects import thing
 
 
 class ThingTestClass(thing.Thing):
+    """Test subclass for Thing aspect."""
+
     _tableName = "testing"
 
 
@@ -17,7 +20,10 @@ environ["AWS_DEFAULT_REGION"] = "ap-southeast-1"
 
 
 class TestThing(unittest.TestCase):
+    """Unit tests for the Thing aspect."""
+
     def setUp(self):
+        """Set up mocked resources, tables, and state machines for testing."""
         self.mocks = [mock_dynamodb(), mock_sns(), mock_stepfunctions(), mock_iam()]
         [mock.start() for mock in self.mocks]
         roleName = "serverless-game-prod-StepFunctionsServiceRole-RANDOM"
@@ -45,53 +51,58 @@ Version: "2012-10-17"
         boto3.client("stepfunctions").create_state_machine(
             name="test",
             definition="""
-                {
-                    "StartAt": "Delay",
-                    "Comment": "Publish to SNS with delay",
-                    "States": {
-                        "Delay": {
-                            "Type": "Wait",
-                            "SecondsPath": "$.delay_seconds",
-                            "Next": "Publish to SNS"
-                        },
-                        "Publish to SNS": {
-                            "Type": "Task",
-                            "Resource": "arn:aws:states:::sns:publish",
-                            "Parameters": {
-                                "TopicArn": "arn:aws:sns:ap-southeast-1:1234567890:ThingTopicName",
-                                "Message.$": "$.data",
-                                "MessageAttributes": {
-                                    "aspect": {
-                                        "DataType": "String",
-                                        "StringValue": "$.data.aspect"
-                                    }
-                                }
-                            },
-                            "End": true
-                        }
+{
+    "StartAt": "Delay",
+    "Comment": "Publish to SNS with delay",
+    "States": {
+        "Delay": {
+            "Type": "Wait",
+            "SecondsPath": "$.delay_seconds",
+            "Next": "Publish to SNS"
+        },
+        "Publish to SNS": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::sns:publish",
+            "Parameters": {
+                "TopicArn": "arn:aws:sns:ap-southeast-1:1234567890:ThingTopicName",
+                "Message.$": "$.data",
+                "MessageAttributes": {
+                    "aspect": {
+                        "DataType": "String",
+                        "StringValue": "$.data.aspect"
                     }
                 }
-            """,
+            },
+            "End": true
+        }
+    }
+}
+""",
             roleArn=role["Role"]["Arn"],
         )
 
     def tearDown(self):
+        """Tear down mocked resources after testing."""
         [mock.stop() for mock in self.mocks]
 
     def test_fail_no_tablename(self):
+        """Test that Thing() raises AssertionError if no table name."""
         with self.assertRaises(AssertionError):
             thing.Thing()
 
     def test_keyerror_on_load_nonexistent(self):
+        """Test loading non-existent Thing raises KeyError."""
         with self.assertRaises(KeyError):
             ThingTestClass("uuid", "tid")
 
     def test_create(self):
+        """Test creation of ThingTestClass instance."""
         t = ThingTestClass("", "tid")
         self.assertEqual(t.tid, "tid")
         self.assertNotEqual(t.uuid, "")
 
     def test_load(self):
+        """Test loading ThingTestClass from UUID."""
         t = ThingTestClass("", "tid")
         uuid = t.uuid
         del t
@@ -100,6 +111,7 @@ Version: "2012-10-17"
         self.assertEqual(t.uuid, uuid)
 
     def test_destroy(self):
+        """Test destroying and reloading a ThingTestClass object."""
         t = ThingTestClass("", "tid")
         uuid = t.uuid
         t.destroy()
@@ -107,6 +119,7 @@ Version: "2012-10-17"
             t = ThingTestClass(uuid, "tid2")
 
     # def test_tick(self):
+    #     """Test that tick function schedules Thing correctly (not implemented)."""
     #     self._createTestTable()
     #     self._createTestSFN()
     #     t = ThingTestClass('', 'tid')
@@ -114,12 +127,14 @@ Version: "2012-10-17"
     #     # TODO: Check that it self-scheduled
 
     def test_prohibited_sets(self):
+        """Test setting attributes directly is prohibited and raises AttributeError."""
         t = ThingTestClass("", "tid")
         with self.assertRaises(AttributeError):
             t.tid = "test"
             t.uuid = "test"
 
     def test_aspectName(self):
+        """Test that aspectName returns class name."""
         t = ThingTestClass("", "tid")
         self.assertEqual(t.aspectName, "ThingTestClass")
 
