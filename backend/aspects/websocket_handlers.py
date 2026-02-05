@@ -5,7 +5,7 @@ import logging
 from typing import Dict, Optional
 from uuid import uuid4
 
-from aspects.aws_client import get_dynamodb_table, get_api_gateway_client
+from aspects.aws_client import get_api_gateway_client, get_dynamodb_table
 from aspects.thing import Call
 
 
@@ -35,7 +35,7 @@ def disconnect_handler(event: dict, context: dict) -> dict:
             originator="",
             uuid=entity_info["uuid"],
             aspect=entity_info["aspect"],
-            action="detach_connection"
+            action="detach_connection",
         ).now()
 
     return {"statusCode": 200}
@@ -64,7 +64,9 @@ def command_handler(event: dict, context: dict) -> dict:
     if not entity_info:
         return {
             "statusCode": 403,
-            "body": json.dumps({"error": "Not possessing any entity. Send 'possess' first."})
+            "body": json.dumps(
+                {"error": "Not possessing any entity. Send 'possess' first."}
+            ),
         }
 
     # Route command to entity via SNS
@@ -75,7 +77,7 @@ def command_handler(event: dict, context: dict) -> dict:
         aspect=entity_info["aspect"],
         action="receive_command",
         command=command,
-        **data
+        **data,
     ).now()
 
     return {"statusCode": 200}
@@ -89,7 +91,9 @@ def _handle_possess(connection_id: str, data: dict) -> dict:
     if not entity_uuid or not entity_aspect:
         return {
             "statusCode": 400,
-            "body": json.dumps({"error": "possess requires entity_uuid and entity_aspect"})
+            "body": json.dumps(
+                {"error": "possess requires entity_uuid and entity_aspect"}
+            ),
         }
 
     # First, detach this connection from any existing entity
@@ -100,7 +104,7 @@ def _handle_possess(connection_id: str, data: dict) -> dict:
             originator="",
             uuid=existing["uuid"],
             aspect=existing["aspect"],
-            action="detach_connection"
+            action="detach_connection",
         ).now()
 
     # Attach to new entity
@@ -110,12 +114,12 @@ def _handle_possess(connection_id: str, data: dict) -> dict:
         uuid=entity_uuid,
         aspect=entity_aspect,
         action="attach_connection",
-        connection_id=connection_id
+        connection_id=connection_id,
     ).now()
 
     return {
         "statusCode": 200,
-        "body": json.dumps({"status": "possessing", "entity_uuid": entity_uuid})
+        "body": json.dumps({"status": "possessing", "entity_uuid": entity_uuid}),
     }
 
 
@@ -127,14 +131,11 @@ def _find_entity_by_connection(connection_id: str) -> Optional[Dict]:
     # NOTE: In production, add a GSI on connection_id for efficiency
     response = table.scan(
         FilterExpression="connection_id = :cid",
-        ExpressionAttributeValues={":cid": connection_id}
+        ExpressionAttributeValues={":cid": connection_id},
     )
 
     items = response.get("Items", [])
     if items:
         item = items[0]
-        return {
-            "uuid": item["uuid"],
-            "aspect": item.get("aspect", "Thing")
-        }
+        return {"uuid": item["uuid"], "aspect": item.get("aspect", "Thing")}
     return None

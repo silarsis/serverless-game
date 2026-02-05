@@ -82,7 +82,7 @@ def admin_only(func: Callable) -> Callable:
         class WorldManager(Thing):
             @admin_only
             def shutdown(self, reason: str) -> dict:
-                '''Shutdown the world - admin only.'''
+                # Shutdown the world - admin only.
                 return {"status": "shutting_down"}
     """
 

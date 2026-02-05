@@ -8,11 +8,13 @@ Apply these changes to backend/aspects/thing.py
 # ===== 1. ADD TO IMPORTS =====
 
 from typing import Optional  # Already imported, just add Optional if not present
+
 from botocore.exceptions import ClientError
+
 from aspects.aws_client import get_api_gateway_client  # Add this import
 
-
 # ===== 2. ADD TO Thing CLASS =====
+
 
 class Thing(UserDict):
     # ... existing code ...
@@ -46,7 +48,7 @@ class Thing(UserDict):
             api_gateway = get_api_gateway_client()
             api_gateway.post_to_connection(
                 ConnectionId=self.connection_id,
-                Data=json.dumps(event, cls=DecimalEncoder)
+                Data=json.dumps(event, cls=DecimalEncoder),
             )
         except ClientError as e:
             error_code = e.response.get("Error", {}).get("Code", "Unknown")
@@ -85,6 +87,7 @@ class Thing(UserDict):
 
 # ===== USAGE EXAMPLE in subclass =====
 
+
 class Location(Thing):
     @callable
     def move(self, destination: str) -> EventType:
@@ -93,15 +96,18 @@ class Location(Thing):
         self.location = destination
 
         # Broadcast to world via SNS (existing pattern)
-        self.call(self.uuid, "Location", "notify_move",
-                  old=old_location, new=destination).now()
+        self.call(
+            self.uuid, "Location", "notify_move", old=old_location, new=destination
+        ).now()
 
         # Push directly to connected player (NEW)
-        self.push_event({
-            "event": "you_moved",
-            "from": old_location,
-            "to": destination,
-            "timestamp": "2025-01-01T00:00:00Z"
-        })
+        self.push_event(
+            {
+                "event": "you_moved",
+                "from": old_location,
+                "to": destination,
+                "timestamp": "2025-01-01T00:00:00Z",
+            }
+        )
 
         return {"status": "moved", "to": destination}

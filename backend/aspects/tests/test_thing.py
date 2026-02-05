@@ -27,7 +27,9 @@ class TestThing(unittest.TestCase):
             AttributeDefinitions=[{"AttributeName": "uuid", "AttributeType": "S"}],
             ProvisionedThroughput={"ReadCapacityUnits": 1, "WriteCapacityUnits": 1},
         )
-        environ["THING_TOPIC_ARN"] = boto3.resource("sns").create_topic(Name="ThingTopic").arn
+        environ["THING_TOPIC_ARN"] = (
+            boto3.resource("sns").create_topic(Name="ThingTopic").arn
+        )
         role = boto3.client("iam").create_role(
             RoleName=roleName,
             AssumeRolePolicyDocument="""

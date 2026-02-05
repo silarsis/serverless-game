@@ -31,8 +31,7 @@ from aspects import land, landCreator, location, thing
 from aspects.handler import lambdaHandler
 
 logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -40,28 +39,26 @@ logger = logging.getLogger(__name__)
 def setup_localstack_clients(endpoint_url: str = "http://localhost:4566"):
     """Configure boto3 to use LocalStack endpoints."""
     os.environ["AWS_ACCESS_KEY_ID"] = os.environ.get("AWS_ACCESS_KEY_ID", "test")
-    os.environ["AWS_SECRET_ACCESS_KEY"] = os.environ.get("AWS_SECRET_ACCESS_KEY", "test")
-    os.environ["AWS_DEFAULT_REGION"] = os.environ.get("AWS_DEFAULT_REGION", "ap-southeast-1")
+    os.environ["AWS_SECRET_ACCESS_KEY"] = os.environ.get(
+        "AWS_SECRET_ACCESS_KEY", "test"
+    )
+    os.environ["AWS_DEFAULT_REGION"] = os.environ.get(
+        "AWS_DEFAULT_REGION", "ap-southeast-1"
+    )
 
     # Create clients with LocalStack endpoint
     session = boto3.Session()
 
     dynamodb = session.resource(
-        "dynamodb",
-        endpoint_url=endpoint_url,
-        region_name="ap-southeast-1"
+        "dynamodb", endpoint_url=endpoint_url, region_name="ap-southeast-1"
     )
 
     sns = session.resource(
-        "sns",
-        endpoint_url=endpoint_url,
-        region_name="ap-southeast-1"
+        "sns", endpoint_url=endpoint_url, region_name="ap-southeast-1"
     )
 
     stepfunctions = session.client(
-        "stepfunctions",
-        endpoint_url=endpoint_url,
-        region_name="ap-southeast-1"
+        "stepfunctions", endpoint_url=endpoint_url, region_name="ap-southeast-1"
     )
 
     return dynamodb, sns, stepfunctions
@@ -72,7 +69,7 @@ def create_event(
     action: str,
     uuid: str,
     data: Optional[Dict[str, Any]] = None,
-    tid: Optional[str] = None
+    tid: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Create a game event."""
     return {
@@ -100,16 +97,10 @@ def invoke_handler(aspect_name: str, event: Dict[str, Any]):
     handler_func = getattr(module, "handler", None)
     if handler_func:
         # Wrap event in SNS format as expected by lambdaHandler
-        sns_event = {
-            "Records": [
-                {
-                    "Sns": {
-                        "Message": json.dumps(event)
-                    }
-                }
-            ]
-        }
-        logger.info(f"Invoking {aspect_name} handler with action: {event.get('action')}")
+        sns_event = {"Records": [{"Sns": {"Message": json.dumps(event)}}]}
+        logger.info(
+            f"Invoking {aspect_name} handler with action: {event.get('action')}"
+        )
         handler_func(sns_event, {})
     else:
         logger.warning(f"No handler function found in module: {aspect_name}")
@@ -128,10 +119,7 @@ def create_land_creator():
     """Create a LandCreator entity at origin."""
     tid = str(uuid4())
     event = create_event(
-        aspect="LandCreator",
-        action="create",
-        uuid=str(uuid4()),
-        tid=tid
+        aspect="LandCreator", action="create", uuid=str(uuid4()), tid=tid
     )
     process_single_event(event)
     logger.info("Created LandCreator at origin")
@@ -140,11 +128,7 @@ def create_land_creator():
 
 def tick_land_creator(uuid: str):
     """Send a tick event to a LandCreator."""
-    event = create_event(
-        aspect="LandCreator",
-        action="tick",
-        uuid=uuid
-    )
+    event = create_event(aspect="LandCreator", action="tick", uuid=uuid)
     process_single_event(event)
     logger.info(f"Sent tick to LandCreator {uuid}")
 
@@ -224,25 +208,18 @@ def interactive_mode():
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Local runner for serverless-game"
-    )
+    parser = argparse.ArgumentParser(description="Local runner for serverless-game")
     parser.add_argument(
         "--command",
         choices=["create_land_creator", "explore", "interactive"],
         default="interactive",
-        help="Command to run"
+        help="Command to run",
     )
     parser.add_argument(
-        "--ticks",
-        type=int,
-        default=5,
-        help="Number of ticks for explore command"
+        "--ticks", type=int, default=5, help="Number of ticks for explore command"
     )
     parser.add_argument(
-        "--env-file",
-        default=".env.local",
-        help="Path to environment file"
+        "--env-file", default=".env.local", help="Path to environment file"
     )
 
     args = parser.parse_args()
@@ -261,8 +238,14 @@ def main():
         os.environ.setdefault("THING_TABLE", "thing-table-local")
         os.environ.setdefault("LOCATION_TABLE", "location-table-local")
         os.environ.setdefault("LAND_TABLE", "land-table-local")
-        os.environ.setdefault("THING_TOPIC_ARN", "arn:aws:sns:ap-southeast-1:000000000000:thing-topic-local")
-        os.environ.setdefault("MESSAGE_DELAYER_ARN", "arn:aws:states:ap-southeast-1:000000000000:stateMachine:message-delayer-local")
+        os.environ.setdefault(
+            "THING_TOPIC_ARN",
+            "arn:aws:sns:ap-southeast-1:000000000000:thing-topic-local",
+        )
+        os.environ.setdefault(
+            "MESSAGE_DELAYER_ARN",
+            "arn:aws:states:ap-southeast-1:000000000000:stateMachine:message-delayer-local",
+        )
 
     # Setup LocalStack clients
     endpoint = os.environ.get("LOCALSTACK_ENDPOINT", "http://localhost:4566")

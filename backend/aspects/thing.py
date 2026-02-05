@@ -14,7 +14,9 @@ from aspects.aws_client import (
 )
 
 EventType = Dict[str, Any]  # Actually needs to be json-able
-IdType = str  # This is a UUID cast to a str, but I want to identify it for typing purposes
+IdType = (
+    str  # This is a UUID cast to a str, but I want to identify it for typing purposes
+)
 
 
 def callable(func):
@@ -39,7 +41,13 @@ class DecimalEncoder(json.JSONEncoder):
 
 class Call(UserDict):
     def __init__(
-        self, tid: str, originator: IdType, uuid: IdType, aspect: str, action: str, **kwargs
+        self,
+        tid: str,
+        originator: IdType,
+        uuid: IdType,
+        aspect: str,
+        action: str,
+        **kwargs,
     ):
         super().__init__()
         self._originating_uuid = originator
@@ -49,7 +57,9 @@ class Call(UserDict):
         self.data["action"] = action
         self.data["data"] = kwargs
 
-    def thenCall(self, aspect: str, action: str, uuid: IdType, **kwargs: Dict) -> "Call":
+    def thenCall(
+        self, aspect: str, action: str, uuid: IdType, **kwargs: Dict
+    ) -> "Call":
         assert self._originating_uuid
         callback = {
             "tid": self["tid"],
@@ -80,7 +90,9 @@ class Call(UserDict):
         sfn = get_stepfunctions_client()
         return sfn.start_execution(
             stateMachineArn=environ["MESSAGE_DELAYER_ARN"],
-            input=json.dumps({"delay_seconds": seconds, "data": self.data}, cls=DecimalEncoder),
+            input=json.dumps(
+                {"delay_seconds": seconds, "data": self.data}, cls=DecimalEncoder
+            ),
         )
 
 
@@ -153,7 +165,9 @@ class Thing(UserDict):
         )
 
     def aspect(self, aspect: str) -> "Thing":
-        return getattr(importlib.import_module(aspect.lower()), aspect)(self.uuid, self.tid)
+        return getattr(importlib.import_module(aspect.lower()), aspect)(
+            self.uuid, self.tid
+        )
 
     @property
     def aspectName(self) -> str:
@@ -186,7 +200,9 @@ class Thing(UserDict):
 
         # Security: Validate action is not private and is in allowed actions
         if action.startswith("_"):
-            raise ValueError(f"Action '{action}' is not allowed (private methods are prohibited)")
+            raise ValueError(
+                f"Action '{action}' is not allowed (private methods are prohibited)"
+            )
 
         # Get allowed actions for this class (combine parent and current class allowed actions)
         allowed = cls._get_allowed_actions()
@@ -216,7 +232,11 @@ class Thing(UserDict):
     # Below here are questionable for this class
 
     def _sendEvent(self, event: EventType) -> str:
-        sendEvent: Dict = {"default": "", "tid": self.tid, "actor_uuid": self.data["uuid"]}
+        sendEvent: Dict = {
+            "default": "",
+            "tid": self.tid,
+            "actor_uuid": self.data["uuid"],
+        }
         sendEvent.update(event or {})
         topic = get_sns_topic("THING_TOPIC_ARN")
         return topic.publish(Message=json.dumps(sendEvent), MessageStructure="json")
