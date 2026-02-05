@@ -28,6 +28,7 @@ class Thing(UserDict):
     def push_event(self, event: dict) -> None:
         """Push an event to the connected WebSocket client if connection exists."""
         from aspects.thing import DecimalEncoder  # avoid import loops
+
         if not self.connection_id:
             return
         try:

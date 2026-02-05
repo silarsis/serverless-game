@@ -56,9 +56,7 @@ class Land(Location):
             UUID of the land at those coordinates.
         """
         coords_str = cls._convertCoordinatesForStorage(coordinates)
-        key_condition = Key("coordinates").eq(
-            coords_str
-        )
+        key_condition = Key("coordinates").eq(coords_str)
         table = get_dynamodb_table(cls._tableName)
         queryResults = table.query(
             IndexName="cartesian",
@@ -72,9 +70,7 @@ class Land(Location):
         return land.uuid
 
     @classmethod
-    def _new_coords_by_direction(
-        cls, coordinates: CoordType, direction: str
-    ) -> CoordType:
+    def _new_coords_by_direction(cls, coordinates: CoordType, direction: str) -> CoordType:
         """Compute new coordinates by moving in the given direction.
 
         Args:
@@ -108,10 +104,7 @@ class Land(Location):
         Returns:
             UUID of the land in that direction.
         """
-        new_coord = Land._new_coords_by_direction(
-            self.coordinates,
-            direction
-        )
+        new_coord = Land._new_coords_by_direction(self.coordinates, direction)
         land_id = self.by_coordinates(new_coord)
         return land_id
 
@@ -126,12 +119,7 @@ class Land(Location):
             Updated exits dictionary.
         """
         if not dest:
-            new_coord = self._new_coords_by_direction(
-                self.coordinates, d
-            )
+            new_coord = self._new_coords_by_direction(self.coordinates, d)
             dest = Land.by_coordinates(new_coord)
-        result = super().add_exit(
-            d,
-            dest
-        )
+        result = super().add_exit(d, dest)
         return result
