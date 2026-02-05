@@ -20,7 +20,7 @@
   },
   "homepage": "https://github.com/silarsis/serverless-game#readme",
   "dependencies": {
-    "serverless": "^2.65.0",
+    "serverless": "^4.31.2",
     "serverless-finch": "^2.6.0",
     "serverless-pseudo-parameters": "^2.5.0",
     "serverless-single-page-app-plugin": "^1.0.4"
