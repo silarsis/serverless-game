@@ -260,8 +260,9 @@ Always routed through SNS to preserve the event architecture. Never direct Lambd
   - Create `users` DynamoDB table (email PK, password hash, entity assignment)
   - Implement registration API (email validation, password hashing)
   - Implement verification flow (token generation, email sending)
-  - Auto-create Player entity on successful verification
-  - See open questions in docs/REQUIREMENTS.md for Kevin's decisions
+  - Auto-create Player entity on successful verification (starting location: 0,0,0)
+  - Forgot password flow (request + reset)
+  - MVP: Display verification/reset codes on page (no email needed for testing)
 - [ ] **Authentication System** — Login/logout with JWT
   - Password validation against bcrypt/argon2 hash
   - JWT generation with claims: sub, email, entity_uuid, entity_aspect
@@ -275,13 +276,15 @@ Always routed through SNS to preserve the event architecture. Never direct Lambd
 - [ ] Add keepalive/ping to prevent 2-hour timeout
 
 ### Near Term (This Week)
-- [ ] **Web UI — Auth Pages** — Signup, login, verification
+- [ ] **Web UI — Auth Pages (React)** — Signup, login, verification
+  - React app with React Router
   - Landing page with game description
   - Signup form (email, password, confirm)
-  - "Check your email" confirmation page
-  - Verification link handler
+  - "Copy your verification code" page (MVP: display token on page)
+  - Verification code entry page
   - Login form with error handling
-- [ ] **Web UI — Game Page** — `/play` interface
+  - Forgot password flow (request + reset pages)
+- [ ] **Web UI — Game Page (React)** — `/play` interface
   - WebSocket connection with auto-possession
   - Event log panel (styled by event type)
   - Sidebar: location, stats, inventory

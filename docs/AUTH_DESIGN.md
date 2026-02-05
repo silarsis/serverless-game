@@ -57,11 +57,55 @@
 - **Token Expiry:** 24h, invalidate after use
 - **Email:** Throttle verification attempts; optionally limit by IP/email
 
-## 6. Lambda/Function Structure
+## 6. Forgot Password Flow
+
+### Request Reset (Step 1)
+1. User clicks "Forgot password?", enters email
+2. Lambda `auth_forgot_request`:
+    - Get user by email PK
+    - If user exists and status==`active`:
+      - Generate `reset_token` (`secrets.token_urlsafe(32)`)
+      - Set `reset_expiry` (now + 1h)
+      - Store token/expiry in user record
+      - (MVP: Return token in response for testing)
+      - (Production: Trigger email with reset link)
+    - Always return success (don't reveal if email exists)
+
+### Reset Password (Step 2)
+1. User enters token + new password
+2. Lambda `auth_forgot_reset`:
+    - Get user by email (user provides email again, or token contains encoded ref)
+    - Check `reset_token` matches and `reset_expiry` > now
+    - If valid:
+      - Hash new password (argon2)
+      - Update `password_hash`
+      - Clear `reset_token` and `reset_expiry`
+      - Return success
+    - If invalid/expired: return error
+
+## 7. MVP Testing Mode (No Email)
+
+For development/testing without email infrastructure:
+
+**Registration:**
+- `auth_register` returns verification token in API response
+- Frontend displays: "Copy this code: XYZ123"
+- User pastes code into verification page
+
+**Forgot Password:**
+- `auth_forgot_request` returns reset token in API response
+- Frontend displays: "Reset code: ABC789"
+- User pastes code + new password
+
+**Note:** Tokens still expire (24h for verify, 1h for reset) for security.
+
+## 8. Lambda/Function Structure
 - Separate Lambdas/functions:
-  - `auth_register`
-  - `auth_verify`
-  - `auth_login`
+  - `auth_register` — Create user, generate verify token
+  - `auth_verify` — Validate token, activate user, create entity
+  - `auth_login` — Validate creds, issue JWT
+  - `auth_forgot_request` — Generate reset token
+  - `auth_forgot_reset` — Validate token, update password
 - Managed as `auth` aspect if grouping supported
 
 ## 7. Email Structure

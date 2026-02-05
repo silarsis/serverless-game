@@ -1,156 +1,169 @@
 # Email Verification System Design – serverless-game
 
-## 1. Email Delivery Mechanism
+## MVP Testing Mode (No Email Infrastructure)
+
+For initial development and testing, we'll skip email delivery and display tokens directly on the web page:
+
+**Flow:**
+1. User submits registration
+2. System generates verification token
+3. Frontend displays: "Your verification code: XYZ123ABC - copy this and paste it on the verification page"
+4. User navigates to verification page, pastes code
+5. Same for forgot password reset codes
+
+**Benefits:**
+- No email service setup needed for MVP
+- Immediate testing of full auth flow
+- Tokens still expire (24h verification, 1h reset) for security
+- Easy to switch to email later (just change token delivery method)
+
+**Production Upgrade Path:**
+Replace on-page display with email sending via SES (see below).
+
+---
+
+## 1. Email Delivery Mechanism (Production)
 
 ### Options Considered
-- **AWS SES (Simple Email Service):**
-  - **Pros:**
-    - Deep AWS integration (IAM, Lambda, CloudWatch)
-    - Extremely cost-effective ($0.10/1,000 emails after 62,000 free/month)
-    - Highly reliable and scalable
-    - Supports API and SMTP
-  - **Cons:**
-    - Can be complex to set up initially (DKIM, SPF, verification)
-    - Sandbox restrictions until account is verified
-    - Limited support on lower AWS plans
-- **SendGrid:**
-  - **Pros:**
-    - Popular among developers, good docs
-    - Managed dashboards, analytics, better support tiers
-    - Less AWS lock-in
-  - **Cons:**
-    - Higher pricing at scale (~$20 per 75,000 emails)
-    - Third-party dependency, rate limits possible
-    - Can require extra middleware for complex flows
-- **Direct SMTP (using Lambda to connect to other SMTP):**
-  - **Pros:**
-    - Use with any existing SMTP server
-    - No extra vendor lock-in
-  - **Cons:**
-    - Reliability & deliverability issues
-    - More likely to get flagged as spam
-    - Management overhead (rate limits, IP reputation, blacklisting)
 
-### **Recommendation:**
-**AWS SES** is highly cost-effective, reliable, and integrates natively with Lambda and the rest of our stack. We recommend SES unless you require SendGrid's analytics, dashboards, or multi-cloud support.
+| Service | Free Tier | Paid | Best For |
+|---------|-----------|------|----------|
+| **AWS SES** | 62,000 emails/month from EC2/Lambda | $0.10/1,000 | AWS-native, cheapest at scale |
+| **SendGrid** | 100 emails/day | ~$20/75,000 | Analytics, dashboards |
+| **Mailgun** | 5,000 emails/month (3 months) | $0.80/1,000 | Good deliverability |
+| **Postmark** | 100 emails/month trial | $10/10,000 | Transactional focus |
 
+### **Recommendation: AWS SES**
+
+**Why:**
+- Deep AWS integration (IAM, Lambda, CloudWatch)
+- 62,000 free emails/month when sending from Lambda/EC2
+- Then only $0.10 per 1,000 emails
+- Reliable deliverability with proper setup
+- No third-party dependency
+
+**Setup steps:**
+1. Verify domain in SES (add DKIM/SPF records)
+2. Verify email address (for testing in sandbox)
+3. Request production access (move out of sandbox)
+4. Configure IAM role for Lambda to send email
+
+---
 
 ## 2. Email Sending Architecture
 
-### Synchronous (API waits for send)
-- Simpler for small scale
-- API call latency depends on email sending speed
-- If SES/SMTP is slow, user registration delays
-- Email errors surface immediately
+### MVP (Testing Mode): Synchronous Token Return
+- API returns token in response body
+- Frontend displays token to user
+- No external dependencies
 
-### Asynchronous (decoupled)
-- **Pattern:** Lambda → (SNS/SQS/EventBridge queue) → Email Lambda sender
-- API can respond instantly; email sending retries, backoff, DLQs handled separately
-- Handles spikes, retries on SES throttle, isolates failures
-- Scalable: async patterns are best practice in serverless
+### Production: Asynchronous Email Sending
+**Pattern:** Lambda → SNS → Email Lambda
 
-### **Recommendation:**
-**Async email sending** via SNS or SQS trigger to a dedicated "send email" Lambda. Improves reliability and user experience.
+**Why async:**
+- API responds immediately (don't wait for email)
+- Retries on SES throttle automatically
+- Isolates email failures from registration API
+- Scales with spikes
 
+---
 
 ## 3. Token Management
 
-### Where to store verification tokens?
-- **users Table (with token & TTL columns):**
-  - Simple for small scale
-  - Problematic if you want multiple unexpired tokens (resends)
-- **Separate verifications Table:**
-  - Store: id, user_id, token, expiry, status
-  - Easily handles multiple valid tokens for one user (e.g., rate limiting, resends)
-  - Easier to query for expired tokens and cleanup
+Store tokens in the `users` table:
 
-### **Recommendation:**
-- Create a **`verifications` table** (user_id, token, expiry, status)
-- Always generate new token on resend, store each instance
-- Cleanup old tokens via scheduled Lambda/TTL
-
-
-## 4. Resend Verification Handling
-- Allow one active token per user, or keep all (and only newest counts)
-- Rate-limit resends (e.g., max every 60 seconds; 5/hour)
-- On resend, old tokens expire, new one issued
-- Expose endpoint for resending; same SNS process triggers email with latest token
-
-
-## 5. Error Handling Strategy
-
-### Issues:
-- SES/SMTP failures (log/retry via SQS DLQ)
-- Bounced emails (handled by SES bounce notifications via SNS)
-- Invalid emails (validate syntactically before send)
-- Rate limit resend endpoint, log abuse
-
-#### **Tactics:**
-- Use **SES SNS bounce notifications** to mark emails invalid in DB
-- All email sends should be idempotent and retryable (async, DLQ)
-- Use reasonable rate limits (per IP and per email)
-- Log failed deliveries for manual review
-
-
-## 6. Email Content and Template
-
-- Use **plain text** for reliability (consider adding HTML later)
-- Template system: Keep one base template, interpolate values in Lambda
-- Minimal branding, clear call-to-action
-- Verification link = `https://app.example.com/verify?token=XXXX`
-
-#### **Example Template (Plain Text)**
 ```
-Subject: Verify your email – serverless-game
+verification_token: string (when status=pending)
+verification_expiry: number (Unix timestamp)
+reset_token: string (when password reset requested)
+reset_expiry: number (Unix timestamp)
+```
 
-Hi {{username}},
+**Why not separate table:** Simpler for our scale, single query to check token.
 
-Thanks for registering for serverless-game!
+**Expiry times:**
+- Verification: 24 hours
+- Password reset: 1 hour
 
-Please verify your email by clicking the link below:
+---
 
-{{verification_link}}
+## 4. Email Templates
+
+### Verification Email
+```
+Subject: Verify your serverless-game account
+
+Hi,
+
+Welcome to serverless-game! Please verify your email by clicking:
+
+https://game.example.com/verify?token=XYZ123ABC
+
+This link expires in 24 hours.
 
 If you didn't sign up, you can ignore this email.
 
-Thanks,
-The serverless-game team
+— The serverless-game team
 ```
 
-## 7. Sample Code: Sending Email from Lambda with SES
+### Password Reset Email
+```
+Subject: Password reset request
 
-```js
-// AWS SDK v3 (Node.js)
-import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
+Hi,
 
-const ses = new SESClient({ region: 'us-east-1' });
+We received a request to reset your password. Click this link:
 
-export async function sendVerificationEmail({ to, username, token }) {
-  const verificationLink = `https://app.example.com/verify?token=${token}`;
-  const params = {
-    Source: 'no-reply@example.com',
-    Destination: { ToAddresses: [to] },
-    Message: {
-      Subject: { Data: 'Verify your email – serverless-game' },
-      Body: {
-        Text: {
-          Data: `Hi ${username},\n\nPlease verify: ${verificationLink}\n\n— Team`,
-        },
-      },
-    },
-  };
-  await ses.send(new SendEmailCommand(params));
-}
+https://game.example.com/reset?token=ABC789XYZ
+
+This link expires in 1 hour.
+
+If you didn't request this, you can ignore this email.
+
+— The serverless-game team
 ```
 
 ---
 
-# Summary Table
-- **Service:** AWS SES (recommended)
-- **Architecture:** Async send via SNS→Lambda
-- **Token Storage:** Separate verifications table
-- **Errors:** Async retries, SNS bounce handling, rate limiting
-- **Template:** Plain text (sample above)
+## 5. Sample Code: Lambda Sending Email (Python)
+
+```python
+import boto3
+from botocore.exceptions import ClientError
+
+ses = boto3.client('ses', region_name='us-east-1')
+
+def send_verification_email(to_email: str, token: str):
+    verification_link = f"https://game.example.com/verify?token={token}"
+    
+    try:
+        response = ses.send_email(
+            Source='no-reply@game.example.com',
+            Destination={'ToAddresses': [to_email]},
+            Message={
+                'Subject': {'Data': 'Verify your serverless-game account'},
+                'Body': {
+                    'Text': {
+                        'Data': f'Welcome! Verify: {verification_link}\n\nExpires in 24h.'
+                    }
+                }
+            }
+        )
+        return {'message_id': response['MessageId']}
+    except ClientError as e:
+        return {'error': str(e)}
+```
 
 ---
-For further questions, see the AWS SES and Lambda docs, or this file's source links.
+
+## Summary
+
+| Phase | Token Delivery | Service | Notes |
+|-------|----------------|---------|-------|
+| **MVP** | Display on page | None | Immediate testing, no setup |
+| **Staging** | SES email | AWS SES | Test with real email, still low volume |
+| **Production** | SES email | AWS SES | 62k free/month, then cheap |
+
+---
+
+*Last updated: 2026-02-05*

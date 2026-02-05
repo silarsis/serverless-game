@@ -187,30 +187,66 @@ for event in agent.events():
 
 ---
 
-## Open Questions
+## Decisions Made
 
-1. **Password Requirements:** Min length? Complexity (upper, lower, number, symbol)?
+### Security & Auth
+- **Password requirements:** None for MVP (tighten when implementing OAuth)
+- **Rate limiting:** None for MVP (noted for future work)
+- **Forgot password:** Implement now — flow: request → email token → reset form
+- **Server-side sessions:** JWT-only (stateless)
 
-2. **Email Provider:** Use existing SMTP (your domain?), or service like SendGrid/AWS SES?
+### Email
+- **MVP/Testing:** Print verification code on web page (no email service needed initially)
+- **Production:** AWS SES (62k free emails/month, then $0.10/1k)
+- **Alternatives considered:** SendGrid (100 free/day), Mailgun (5k free/month), Postmark ($10/10k)
 
-3. **Starting Location:** Fixed (0,0,0)? Random spawn point? Tutorial zone?
+### Game Design
+- **Starting location:** 0,0,0 (origin)
+- **Display names:** Entity name (not player/web connection) — entity is the identity
+- **Starting gear:** None (empty inventory)
 
-4. **Web Frontend Stack:** 
-   - Keep current vanilla JS + HTML?
-   - Upgrade to React/Vue/Svelte?
-   - Use templating engine?
+### Technical Stack
+- **Web frontend:** React (upgrade from vanilla JS)
+- **Auth methods:** Email/password for now, Google OAuth next (investigating)
+- **Agent API auth:** Same JWT as web (no separate API keys)
 
-5. **Server-Side Sessions:** JWT-only (stateless), or maintain server-side sessions table?
+---
 
-6. **Rate Limiting:** Prevent signup spam, brute force login?
+## Forgot Password Flow
 
-7. **Forgot Password:** Implement now or later?
+1. User clicks "Forgot password?" on login page
+2. Enters email address
+3. System generates reset token (similar to verification), stores with 1h expiry
+4. (MVP: Display token on page for testing) / (Production: Email token)
+5. User enters token + new password
+6. System validates token, updates password hash, invalidates token
+7. Redirect to login
 
-8. **Agent API Auth:** Same JWT as web, or API keys?
+---
 
-9. **Entity Starting State:** New players start with what? Empty inventory? Starter items?
+## MVP Testing Mode (No Email)
 
-10. **Username vs Email:** Do players have display names separate from email?
+For initial development/testing without email service:
+- Registration shows: "Your verification code: ABC123XYZ"
+- User copies code to verification page
+- Same flow, just no email sending
+
+This allows testing the full flow before setting up SES/email infrastructure.
+
+---
+
+## Production Email (AWS SES)
+
+**Why SES:**
+- 62,000 free emails/month from EC2/Lambda
+- Then $0.10 per 1,000 emails
+- Native AWS integration (IAM, CloudWatch)
+- Reliable deliverability
+
+**Setup needed:**
+- Verify domain or email address
+- Configure DKIM/SPF (for domain)
+- Move out of SES sandbox (for production)
 
 ---
 
