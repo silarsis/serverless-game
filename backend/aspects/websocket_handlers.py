@@ -5,13 +5,13 @@ import logging
 from typing import Dict, Optional
 from uuid import uuid4
 
-from aspects.aws_client import get_api_gateway_client, get_dynamodb_table
+from aspects.aws_client import get_dynamodb_table
 from aspects.thing import Call
 
 
 def connect_handler(event: dict, context: dict) -> dict:
-    """
-    Handle WebSocket $connect.
+    """Handle WebSocket $connect.
+
     Just accepts the connection—entity binding happens separately via 'possess' command.
     """
     connection_id = event["requestContext"]["connectionId"]
@@ -20,8 +20,8 @@ def connect_handler(event: dict, context: dict) -> dict:
 
 
 def disconnect_handler(event: dict, context: dict) -> dict:
-    """
-    Handle WebSocket $disconnect.
+    """Handle WebSocket $disconnect.
+
     Find the entity with this connection_id and clear it.
     """
     connection_id = event["requestContext"]["connectionId"]
@@ -42,8 +42,8 @@ def disconnect_handler(event: dict, context: dict) -> dict:
 
 
 def command_handler(event: dict, context: dict) -> dict:
-    """
-    Handle WebSocket command messages.
+    """Handle WebSocket command messages.
+
     Routes to entity.receive_command() via SNS.
     """
     connection_id = event["requestContext"]["connectionId"]
