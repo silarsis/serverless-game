@@ -96,3 +96,29 @@ def get_lambda_client():
             aws_secret_access_key=os.environ.get("AWS_SECRET_ACCESS_KEY", "test"),
         )
     return boto3.client("lambda")
+
+
+def get_api_gateway_client():
+    """Get API Gateway Management API client for WebSocket operations."""
+    callback_url = os.environ.get("WEBSOCKET_API_ENDPOINT")
+    endpoint = get_localstack_endpoint()
+
+    if endpoint:
+        # LocalStack mode - WebSocket management endpoint
+        return boto3.client(
+            "apigatewaymanagementapi",
+            endpoint_url=f"{endpoint}/_aws/execute-api",
+            region_name=os.environ.get("AWS_DEFAULT_REGION", "ap-southeast-1"),
+            aws_access_key_id=os.environ.get("AWS_ACCESS_KEY_ID", "test"),
+            aws_secret_access_key=os.environ.get("AWS_SECRET_ACCESS_KEY", "test"),
+        )
+
+    # Real AWS - use the WebSocket API endpoint (must include stage)
+    if callback_url:
+        return boto3.client(
+            "apigatewaymanagementapi",
+            endpoint_url=callback_url,
+            region_name=os.environ.get("AWS_DEFAULT_REGION", "ap-southeast-1"),
+        )
+
+    raise ValueError("WEBSOCKET_API_ENDPOINT environment variable not set")
