@@ -54,6 +54,17 @@ provider:
     DD_TRACE_GLOBAL_TAGS: "lightstep.service_name:serverless-game,lightstep.access_token:${param:lightstep_access_token}"
 
 functions:
+  authLogin:
+    handler: aspects/auth.auth_login
+    environment:
+      FIREBASE_SERVICE_ACCOUNT: /tmp/firebase-service-account.json
+      USERS_TABLE: users-dev
+      JWT_SECRET: "dev-secret"
+    events:
+      - http:
+          path: /api/auth/login
+          method: post
+          cors: true
   eventlogger:
     handler: aspects/eventLogger.handler
     VpcId:
@@ -121,6 +132,19 @@ functions:
 
 resources:
   Resources:
+    UsersDynamoDBTable:
+      Type: 'AWS::DynamoDB::Table'
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: firebase_uid
+            AttributeType: S
+        KeySchema:
+          - AttributeName: firebase_uid
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        TableName: users-dev
     ThingTopic:
       Type: AWS::SNS::Topic
       Properties:

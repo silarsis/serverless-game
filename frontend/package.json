@@ -20,6 +20,7 @@
   },
   "homepage": "https://github.com/silarsis/serverless-game#readme",
   "dependencies": {
+    "firebase": "^10.0.0",
     "serverless": "^4.31.2",
     "serverless-finch": "^4.0.4",
     "serverless-pseudo-parameters": "^2.5.0",
