@@ -1,0 +1,23 @@
+# Include production dependencies
+-r requirements.txt
+
+# Testing
+pytest>=7.4.0
+pytest-cov>=4.1.0
+moto[dynamodb,sns,stepfunctions,iam]>=4.2.0,<5.0.0
+
+# Local development
+python-dotenv>=1.0.0
+
+# Linting and formatting
+black>=23.0.0
+isort>=5.12.0
+flake8>=6.0.0
+flake8-docstrings>=1.7.0
+
+# Type checking
+mypy>=1.5.0
+boto3-stubs[dynamodb,sns,stepfunctions,iam]>=1.28.0
+
+# Pre-commit
+pre-commit>=3.4.0
