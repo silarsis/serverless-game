@@ -1,4 +1,5 @@
 """Core thing and event/callback logic for serverless-game backend."""
+
 import decimal
 import importlib
 import json
@@ -205,9 +206,7 @@ class Thing(UserDict):
     """Allowed actions for use with the event system."""
 
     @classmethod
-    def _action(
-        cls, event: EventType
-    ):
+    def _action(cls, event: EventType):
         """Process an incoming action/event on this object, enforcing security."""
         action = event.get("action", "")
 

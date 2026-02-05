@@ -67,9 +67,7 @@ class Location(Thing):
     @callable
     def destroy(self):
         """Destroy this location and move contents elsewhere."""
-        dest = (
-            self.location or "Nowhere"
-        )  # TODO: Figure out a better location for dropping objects
+        dest = self.location or "Nowhere"  # TODO: Figure out a better location for dropping objects
         for item in self.contents:
             Location(item, self.tid).location = dest
         self._table.delete_item(Key={"uuid": self.uuid})
