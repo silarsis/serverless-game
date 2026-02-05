@@ -1,3 +1,4 @@
+"""Core thing and event/callback logic for serverless-game backend."""
 import decimal
 import importlib
 import json
@@ -18,7 +19,7 @@ IdType = str  # This is a UUID cast to a str, but I want to identify it for typi
 
 
 def callable(func):
-    """Decorator to mark a method as callable via the event system."""
+    """Mark a method as callable via the event system."""
 
     def wrapper(*args, **kwargs):
         logging.info("Calling {} with {}, {}".format(str(func), str(args), str(kwargs)))
@@ -31,13 +32,18 @@ def callable(func):
 
 
 class DecimalEncoder(json.JSONEncoder):
+    """Custom JSON encoder for Decimal types."""
+
     def default(self, obj):
+        """Encode Decimal as int for JSON serialization."""
         if isinstance(obj, decimal.Decimal):
             return int(obj)
         return super(DecimalEncoder, self).default(obj)
 
 
 class Call(UserDict):
+    """Representation of an event call and its reply/callback stack."""
+
     def __init__(
         self,
         tid: str,
@@ -47,6 +53,7 @@ class Call(UserDict):
         action: str,
         **kwargs,
     ):
+        """Initialize a Call instance."""
         super().__init__()
         self._originating_uuid = originator
         self.data["tid"] = tid
@@ -56,6 +63,7 @@ class Call(UserDict):
         self.data["data"] = kwargs
 
     def thenCall(self, aspect: str, action: str, uuid: IdType, **kwargs: Dict) -> "Call":
+        """Add a callback to be executed after the main action."""
         assert self._originating_uuid
         callback = {
             "tid": self["tid"],
@@ -71,6 +79,7 @@ class Call(UserDict):
         return self
 
     def now(self) -> None:
+        """Publish this call immediately via SNS."""
         sns = get_sns_topic("THING_TOPIC_ARN")
         logging.info(self.data)
         return sns.publish(
@@ -83,6 +92,7 @@ class Call(UserDict):
         )
 
     def after(self, seconds: int = 0) -> None:
+        """Start this call after a given number of seconds via Step Functions."""
         sfn = get_stepfunctions_client()
         return sfn.start_execution(
             stateMachineArn=environ["MESSAGE_DELAYER_ARN"],
@@ -91,16 +101,13 @@ class Call(UserDict):
 
 
 class Thing(UserDict):
-    "Thing objects have state (stored in dynamo) and know how to event and callback"
+    """Base class for game objects. Objects have state (stored in DynamoDB) and handle event/callback logic."""
 
     _tableName: str = ""  # Set this in the subclass
 
     @classmethod
     def _get_allowed_actions(cls) -> frozenset:
-        """Get set of allowed action names for this class.
-
-        This is for security - only methods decorated with @callable are allowed.
-        """
+        """Get set of allowed action names for this class. Only @callable methods allowed."""
         # Start with parent class allowed actions if any
         allowed: set = set()
         for base in cls.__bases__:
@@ -117,6 +124,7 @@ class Thing(UserDict):
         return frozenset(allowed)
 
     def __init__(self, uuid: IdType = None, tid: str = None):
+        """Initialize a Thing with a UUID and transaction ID, loading or creating state."""
         super().__init__()
         assert self._tableName
         self._tid: str = tid or str(uuid4())
@@ -130,6 +138,7 @@ class Thing(UserDict):
 
     @property
     def tickDelay(self):
+        """Get or initialize the tick delay for the object."""
         if "tick_delay" not in self.data:
             self.data["tick_delay"] = 30
             self._save()
@@ -137,57 +146,69 @@ class Thing(UserDict):
 
     @property
     def _table(self):
+        """Return the DynamoDB table for the object's state."""
         return get_dynamodb_table(self._tableName)
 
     @callable
     def create(self) -> None:
+        """Create object in the backing store (DynamoDB)."""
         self._save()
 
     @callable
     def destroy(self) -> None:
+        """Delete this object by UUID."""
         self._table.delete_item(Key={"uuid": self.uuid})
         logging.info("{} has been destroyed".format(self.uuid))
 
     @callable
     def tick(self) -> None:
+        """Schedule this object's next tick."""
         self.schedule_next_tick()
 
     @callable
     def schedule_next_tick(self) -> None:
+        """Schedule the object's next tick after tickDelay seconds."""
         Call(str(uuid4()), self.uuid, self.uuid, self.aspectName, "tick").after(
             seconds=self.tickDelay
         )
 
     def aspect(self, aspect: str) -> "Thing":
+        """Return an aspect handler for this object by aspect name."""
         return getattr(importlib.import_module(aspect.lower()), aspect)(self.uuid, self.tid)
 
     @property
     def aspectName(self) -> str:
+        """Return the object's aspect (class name)."""
         return self.__class__.__name__
 
     def _load(self, uuid: IdType) -> None:
+        """Load object state from DynamoDB by UUID."""
         self.data: Dict = self._table.get_item(Key={"uuid": uuid}).get("Item", {})
         if not self.data:
-            raise KeyError("load for non-existent item {}".format(uuid))
+            raise KeyError(f"load for non-existent item {uuid}")
 
     def _save(self) -> None:
+        """Save object state to DynamoDB."""
         self._table.put_item(Item=self.data)
 
     @property
     def tid(self) -> str:
+        """Return the transaction/request ID for this object."""
         return self._tid
 
     @property
     def uuid(self) -> IdType:
+        """Return the UUID of this object as a string."""
         return str(self.data["uuid"])
 
-    # Define allowed actions as a class variable for security
     _allowed_actions: frozenset = frozenset()
+    """Allowed actions for use with the event system."""
 
     @classmethod
     def _action(
         cls, event: EventType
-    ):  # This is not state related, this is the entry point for the object
+    ):
+        """Process an incoming action/event on this object, enforcing security."""
         action = event.get("action", "")
 
         # Security: Validate action is not private and is in allowed actions
@@ -206,7 +227,6 @@ class Thing(UserDict):
         tid = str(event.get("tid") or uuid4())
         actor = cls(uuid, tid)
 
-        # Get the method - we know it exists and is allowed
         method = getattr(actor, action, None)
         if method is None or not callable(method):
             raise ValueError(f"Action '{action}' is not a valid callable method")
@@ -219,9 +239,8 @@ class Thing(UserDict):
             Call(c["tid"], "", c["uuid"], c["aspect"], c["action"], **data).now()
         actor._save()
 
-    # Below here are questionable for this class
-
     def _sendEvent(self, event: EventType) -> str:
+        """Send an event to the SNS topic with current object's tid and uuid."""
         sendEvent: Dict = {
             "default": "",
             "tid": self.tid,
@@ -232,11 +251,13 @@ class Thing(UserDict):
         return topic.publish(Message=json.dumps(sendEvent), MessageStructure="json")
 
     def call(self, uuid: IdType, aspect: str, action: str, **kwargs):
-        "call('42', 'mobile', 'arrive', kwargs={'destination': '68'}).now()"
+        """Build a Call object to target another aspect/action."""
         return Call(self.tid, self.uuid, uuid, aspect, action, **kwargs)
 
     def callAspect(self, aspect: str, action: str, **kwargs):
+        """Call an aspect on this object."""
         return self.call(self.uuid, aspect, action, **kwargs)
 
     def createAspect(self, aspect: str) -> None:
+        """Create a new aspect for this object's uuid."""
         self.call(self.uuid, aspect, "create")
