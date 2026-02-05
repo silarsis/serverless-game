@@ -6,14 +6,13 @@ via WebSocket commands and internal calls.
 
 import logging
 from functools import wraps
-from typing import Any, Callable, Optional
+from typing import Callable
 
 logger = logging.getLogger(__name__)
 
 
 def player_command(func: Callable) -> Callable:
-    """
-    Decorator marking a method as callable via WebSocket from a player.
+    """Mark a method as callable via WebSocket from a player.
 
     Only methods decorated with @player_command can be invoked through the
     WebSocket interface. This is distinct from @callable which allows
@@ -72,8 +71,7 @@ def player_command(func: Callable) -> Callable:
 
 
 def admin_only(func: Callable) -> Callable:
-    """
-    Decorator marking a method as admin-only.
+    """Mark a method as admin-only.
 
     These methods can only be called by system entities or admin-authenticated
     connections. Used for administrative commands.
@@ -104,8 +102,7 @@ def admin_only(func: Callable) -> Callable:
 
 
 def system_entity(func: Callable) -> Callable:
-    """
-    Class decorator marking an entity as a system entity.
+    """Mark a class as a system entity.
 
     System entities:
     - Cannot be possessed by players
@@ -131,8 +128,7 @@ def system_entity(func: Callable) -> Callable:
 
 # Internal callable decorator (for reference/completeness)
 def callable(func: Callable) -> Callable:
-    """
-    Base decorator for methods that can be called via SNS.
+    """Mark a method as callable via SNS.
 
     This is the existing @callable decorator pattern. Methods decorated
     with @callable can be invoked via SNS Call() but NOT directly via
