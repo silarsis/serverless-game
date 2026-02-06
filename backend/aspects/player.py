@@ -1,4 +1,8 @@
-"""Player entity management for game users."""
+"""Player entity management for game users.
+
+Handles player entity creation/retrieval based on Firebase UIDs.
+Uses UUID5 for stable identifiers and assigns default locations.
+"""
 
 import uuid
 
@@ -12,11 +16,10 @@ def get_or_create_player_entity(firebase_uid):
     Returns:
         dict with uuid, aspect, and location.
     """
-    # For simplicity: generate UUID based on firebase_uid (stable)
+    # Generate stable UUID from firebase_uid
     entity_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, "player-" + firebase_uid))
     aspect = "aspects/player"
-    # Optionally: create in entities table or whatever other infra needed.
-    # For demo: location always (0,0,0)
+    # Demo: location always (0,0,0)
     return {
         "uuid": entity_uuid,
         "aspect": aspect,

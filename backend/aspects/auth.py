@@ -1,6 +1,5 @@
 """Firebase authentication module for verifying tokens and managing users."""
 
-import json
 import os
 import time
 
@@ -19,6 +18,7 @@ FIREBASE_CREDS_PATH = os.environ.get(
 
 
 def _init_firebase():
+    """Initialize Firebase Admin SDK singleton."""
     global FIREBASE_APP
     if not FIREBASE_APP:
         cred = credentials.Certificate(FIREBASE_CREDS_PATH)
@@ -30,108 +30,112 @@ DYNAMODB = boto3.resource("dynamodb")
 USERS_TABLE = os.environ.get("USERS_TABLE", "users-dev")
 TABLE = DYNAMODB.Table(USERS_TABLE)
 
-# JWT secret (use AWS SecretsManager/param store in prod)
-JWT_SECRET = os.environ.get("JWT_SECRET", "dev-secret")
+# JWT settings for WebSocket auth
+JWT_SECRET = os.environ.get("JWT_SECRET", "dev-secret-key")
+JWT_ALGORITHM = "HS256"
+JWT_EXPIRY_HOURS = 24
 
 
-def verify_firebase_token(id_token):
-    """Verify Firebase ID token, return claims."""
+def verify_firebase_token(token: str) -> dict:
+    """Verify a Firebase ID token and return user info.
+
+    Args:
+        token: Firebase ID token from client.
+
+    Returns:
+        dict with firebase_uid, email, name, picture.
+
+    Raises:
+        ValueError: If token is invalid or expired.
+    """
     _init_firebase()
     try:
-        decoded = firebase_auth.verify_id_token(id_token, app=FIREBASE_APP)
+        decoded = firebase_auth.verify_id_token(token)
         return {
-            "uid": decoded["uid"],
-            "email": decoded.get("email"),
-            "name": decoded.get("name"),
-            "picture": decoded.get("picture"),
+            "firebase_uid": decoded["uid"],
+            "email": decoded.get("email", ""),
+            "email_verified": decoded.get("email_verified", False),
+            "name": decoded.get("name", ""),
+            "picture": decoded.get("picture", ""),
         }
     except Exception as e:
-        raise ValueError(f"Invalid token: {e}")
+        raise ValueError(f"Invalid Firebase token: {e}")
 
 
-def get_or_create_user(firebase_uid, email, display_name, photo_url):
-    """Get or create user record in DynamoDB."""
-    now = int(time.time())
-    key = {"firebase_uid": firebase_uid}
-    try:
-        resp = TABLE.get_item(Key=key)
-        user = resp.get("Item")
-        if user:
-            # Update last_login
-            TABLE.update_item(
-                Key=key,
-                UpdateExpression="set last_login = :ll",
-                ExpressionAttributeValues={":ll": now},
-            )
-            return user
-        else:
-            # User does not exist. Create new.
-            from .player import get_or_create_player_entity
-
-            player_entity = get_or_create_player_entity(firebase_uid)
-            new_user = {
-                "firebase_uid": firebase_uid,
-                "email": email,
-                "display_name": display_name,
-                "photo_url": photo_url,
-                "entity_uuid": player_entity["uuid"],
-                "entity_aspect": player_entity["aspect"],
-                "created_at": now,
-                "last_login": now,
-            }
-            TABLE.put_item(Item=new_user)
-            return new_user
-    except ClientError as ce:
-        raise RuntimeError(f"DynamoDB error: {ce}")
-
-
-def create_jwt(payload, expiration=3600):
-    """Create internal JWT for WebSocket auth."""
-    now = int(time.time())
+def _generate_jwt(user_id: str) -> str:
+    """Generate internal JWT for WebSocket auth."""
     payload = {
-        **payload,
-        "iat": now,
-        "exp": now + expiration,
+        "sub": user_id,
+        "iat": int(time.time()),
+        "exp": int(time.time()) + (JWT_EXPIRY_HOURS * 3600),
     }
-    return jwt.encode(payload, JWT_SECRET, algorithm="HS256")
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 
-def auth_login(event, context):
-    """Lambda handler for POST /api/auth/login."""
-    # Extract Authorization header
-    headers = event.get("headers", {})
-    auth_header = headers.get("Authorization", "")
-    if not auth_header.startswith("Bearer "):
-        return {
-            "statusCode": 401,
-            "body": json.dumps({"error": "Missing or invalid Authorization header"}),
-        }
-    id_token = auth_header.replace("Bearer ", "")
+def get_or_create_user(firebase_uid: str, user_info: dict) -> dict:
+    """Get existing user or create new one in DynamoDB.
+
+    Args:
+        firebase_uid: Firebase user ID.
+        user_info: Dict with email, name, picture from Firebase.
+
+    Returns:
+        User record from DynamoDB.
+    """
     try:
-        firebase_user = verify_firebase_token(id_token)
-    except Exception as e:
-        return {"statusCode": 401, "body": json.dumps({"error": str(e)})}
-    # Create/get user and entity
-    user = get_or_create_user(
-        firebase_uid=firebase_user["uid"],
-        email=firebase_user.get("email"),
-        display_name=firebase_user.get("name"),
-        photo_url=firebase_user.get("picture"),
-    )
-    internal_token = create_jwt(
-        {
-            "sub": user["firebase_uid"],
-            "email": user["email"],
-            "entity_uuid": user["entity_uuid"],
-            "entity_aspect": user["entity_aspect"],
-        }
-    )
-    resp = {
-        "token": internal_token,
-        "entity": {
-            "uuid": user["entity_uuid"],
-            "aspect": user["entity_aspect"],
-            # Optional: add location if needed
-        },
+        response = TABLE.get_item(Key={"firebase_uid": firebase_uid})
+        if "Item" in response:
+            return response["Item"]
+    except ClientError as e:
+        print(f"Error getting user: {e}")
+
+    # Create new user
+    user = {
+        "firebase_uid": firebase_uid,
+        "email": user_info.get("email", ""),
+        "name": user_info.get("name", ""),
+        "picture": user_info.get("picture", ""),
+        "created_at": int(time.time()),
+        "last_login": int(time.time()),
     }
-    return {"statusCode": 200, "body": json.dumps(resp)}
+
+    try:
+        TABLE.put_item(Item=user)
+    except ClientError as e:
+        print(f"Error creating user: {e}")
+        raise
+
+    return user
+
+
+def login(token: str) -> dict:
+    """Handle login flow: verify Firebase token, get/create user, return JWT.
+
+    Args:
+        token: Firebase ID token from client.
+
+    Returns:
+        dict with success, jwt, user fields.
+    """
+    try:
+        firebase_user = verify_firebase_token(token)
+        user = get_or_create_user(
+            firebase_user["firebase_uid"],
+            firebase_user,
+        )
+        internal_jwt = _generate_jwt(firebase_user["firebase_uid"])
+
+        return {
+            "success": True,
+            "jwt": internal_jwt,
+            "user": {
+                "firebase_uid": user["firebase_uid"],
+                "email": user["email"],
+                "name": user["name"],
+                "picture": user["picture"],
+            },
+        }
+    except ValueError as e:
+        return {"success": False, "error": str(e)}
+    except Exception as e:
+        return {"success": False, "error": f"Login failed: {e}"}
