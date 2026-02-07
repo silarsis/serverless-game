@@ -89,9 +89,7 @@ def _local_push_event(self, event):
         self._save()
         return
     try:
-        asyncio.get_event_loop().create_task(
-            ws.send_json(event)
-        )
+        asyncio.get_event_loop().create_task(ws.send_json(event))
     except Exception as e:
         logger.error(f"Failed to push event to {conn_id}: {e}")
 
@@ -156,7 +154,9 @@ _original_call_after = Call.after
 def _local_call_after(self, seconds=0):
     """Execute delayed calls immediately in local mode."""
     if seconds > 0:
-        logger.info(f"Skipping {seconds}s delay for {self.data.get('aspect')}.{self.data.get('action')}")
+        logger.info(
+            f"Skipping {seconds}s delay for {self.data.get('aspect')}.{self.data.get('action')}"
+        )
     dispatch_sns_event(self.data)
 
 
@@ -227,6 +227,7 @@ def dev_api_key_login(api_key: str) -> dict:
         }
     # Try real API key lookup
     from aspects.auth import login
+
     return login(api_key=api_key)
 
 
@@ -234,50 +235,29 @@ def dev_api_key_login(api_key: str) -> dict:
 # Player entity management
 # ---------------------------------------------------------------------------
 
-def get_or_create_player_entity(user_id: str, name: str = "Player") -> dict:
-    """Get or create a Land entity for a player.
 
-    Creates a Land entity at the origin (0,0,0) if none exists.
+def get_or_create_player_entity(user_id: str, name: str = "Player") -> dict:
+    """Get or create a player entity at the origin.
+
+    Players possess the origin Land tile directly so they inherit its
+    coordinates, exits, and description. The player's name is stored on
+    the entity.
     Returns {uuid, aspect} for the possess command.
     """
-    import uuid as uuid_module
-    entity_uuid = str(uuid_module.uuid5(uuid_module.NAMESPACE_DNS, "player-" + user_id))
-
-    # Try to load existing entity
-    try:
-        entity = Land(uuid=entity_uuid)
-        logger.info(f"Found existing player entity {entity_uuid}")
-        return {"uuid": entity_uuid, "aspect": "Land"}
-    except (KeyError, Exception):
-        pass
-
-    # Create a new Land entity at origin
-    logger.info(f"Creating new player entity {entity_uuid}")
-    try:
-        origin_uuid = Land.by_coordinates((0, 0, 0))
-        entity = Land(uuid=entity_uuid)
+    origin_uuid = Land.by_coordinates((0, 0, 0))
+    entity = Land(uuid=origin_uuid)
+    # Tag with player name if not already set
+    if not entity.data.get("name"):
         entity.data["name"] = name
-        entity.data["location"] = origin_uuid
         entity._save()
-        return {"uuid": entity_uuid, "aspect": "Land"}
-    except Exception:
-        # If by_coordinates fails (no land at origin), create land at origin first
-        origin = Land()
-        origin.coordinates = (0, 0, 0)
-        origin.data["description"] = "The starting point. A crossroads of paths stretching into the unknown."
-        origin._save()
-
-        entity = Land()
-        entity.data["uuid"] = entity_uuid
-        entity.data["name"] = name
-        entity.data["location"] = origin.uuid
-        entity._save()
-        return {"uuid": entity_uuid, "aspect": "Land"}
+    logger.info(f"Player {user_id} ({name}) possessing origin {origin_uuid}")
+    return {"uuid": origin_uuid, "aspect": "Land"}
 
 
 # ---------------------------------------------------------------------------
 # HTTP handlers
 # ---------------------------------------------------------------------------
+
 
 async def handle_login(request):
     """POST /api/auth/login — authenticate and return JWT."""
@@ -297,6 +277,7 @@ async def handle_login(request):
     else:
         # Try real Google OAuth
         from aspects.auth import login
+
         result = login(token=token)
 
     status = 200 if result.get("success") else 401
@@ -309,7 +290,9 @@ async def handle_login(request):
         entity_info = get_or_create_player_entity(user_id, user_name)
         result["entity"] = entity_info
 
-    return web.json_response(result, status=status, headers={"Access-Control-Allow-Origin": "*"})
+    return web.json_response(
+        result, status=status, headers={"Access-Control-Allow-Origin": "*"}
+    )
 
 
 async def handle_generate_key(request):
@@ -326,6 +309,7 @@ async def handle_generate_key(request):
     bot_name = body.get("bot_name", "unnamed-bot")
 
     from aspects.auth import generate_api_key
+
     result = generate_api_key(claims["sub"], bot_name)
     return web.json_response(result, headers={"Access-Control-Allow-Origin": "*"})
 
@@ -341,8 +325,11 @@ async def handle_list_keys(request):
         return web.json_response({"error": str(e)}, status=401)
 
     from aspects.auth import list_api_keys
+
     keys = list_api_keys(claims["sub"])
-    return web.json_response({"keys": keys}, headers={"Access-Control-Allow-Origin": "*"})
+    return web.json_response(
+        {"keys": keys}, headers={"Access-Control-Allow-Origin": "*"}
+    )
 
 
 async def handle_delete_key(request):
@@ -357,9 +344,12 @@ async def handle_delete_key(request):
 
     api_key = request.match_info.get("key", "")
     from aspects.auth import delete_api_key
+
     result = delete_api_key(claims["sub"], api_key)
     status = 200 if result.get("success") else 403
-    return web.json_response(result, status=status, headers={"Access-Control-Allow-Origin": "*"})
+    return web.json_response(
+        result, status=status, headers={"Access-Control-Allow-Origin": "*"}
+    )
 
 
 async def handle_cors_preflight(request):
@@ -378,6 +368,7 @@ async def handle_cors_preflight(request):
 # ---------------------------------------------------------------------------
 # WebSocket handler
 # ---------------------------------------------------------------------------
+
 
 async def handle_websocket(request):
     """Handle WebSocket connections — replaces API Gateway WebSocket."""
@@ -405,11 +396,13 @@ async def handle_websocket(request):
     bot_name = claims.get("bot_name")
     logger.info(f"WebSocket connected: {connection_id} user={user_id} bot={bot_name}")
 
-    await ws.send_json({
-        "type": "system",
-        "message": f"Connected as {bot_name or user_id}. Use 'possess' to bind to an entity.",
-        "connection_id": connection_id,
-    })
+    await ws.send_json(
+        {
+            "type": "system",
+            "message": f"Connected as {bot_name or user_id}. Use 'possess' to bind to an entity.",
+            "connection_id": connection_id,
+        }
+    )
 
     try:
         async for msg in ws:
@@ -420,10 +413,14 @@ async def handle_websocket(request):
                     cmd_data = data.get("data", {})
 
                     if not command:
-                        await ws.send_json({"type": "error", "message": "Missing command"})
+                        await ws.send_json(
+                            {"type": "error", "message": "Missing command"}
+                        )
                         continue
 
-                    await _handle_ws_command(ws, connection_id, command, cmd_data, claims)
+                    await _handle_ws_command(
+                        ws, connection_id, command, cmd_data, claims
+                    )
 
                 except json.JSONDecodeError:
                     await ws.send_json({"type": "error", "message": "Invalid JSON"})
@@ -468,28 +465,37 @@ async def _handle_ws_command(ws, connection_id, command, data, claims):
             entity.data["connection_id"] = connection_id
             entity._save()
 
-            await ws.send_json({
-                "type": "system",
-                "message": f"Now controlling entity {entity.data.get('name', entity_uuid[:8])} [{entity_uuid[:8]}]",
-            })
+            await ws.send_json(
+                {
+                    "type": "system",
+                    "message": f"Now controlling entity {entity.data.get('name', entity_uuid[:8])} [{entity_uuid[:8]}]",
+                }
+            )
 
             # Auto-look on possess
             if hasattr(entity, "look"):
-                result = entity.look()
-                if result:
-                    await ws.send_json(result)
+                try:
+                    result = entity.look()
+                    if result:
+                        await ws.send_json(result)
+                except Exception as e:
+                    logger.warning(f"Auto-look failed: {e}")
 
         except KeyError:
-            await ws.send_json({"type": "error", "message": f"Entity {entity_uuid} not found"})
+            await ws.send_json(
+                {"type": "error", "message": f"Entity {entity_uuid} not found"}
+            )
         return
 
     # For all other commands, find the entity by connection_id
     entity_info = _find_entity_by_connection(connection_id)
     if not entity_info:
-        await ws.send_json({
-            "type": "error",
-            "message": "Not possessing any entity. Send 'possess' first.",
-        })
+        await ws.send_json(
+            {
+                "type": "error",
+                "message": "Not possessing any entity. Send 'possess' first.",
+            }
+        )
         return
 
     # Load the entity and run the command
@@ -526,7 +532,10 @@ def _find_entity_by_connection(connection_id: str) -> dict:
             items = response.get("Items", [])
             if items:
                 item = items[0]
-                return {"uuid": item["uuid"], "aspect": item.get("aspect", default_aspect)}
+                return {
+                    "uuid": item["uuid"],
+                    "aspect": item.get("aspect", default_aspect),
+                }
         except Exception as e:
             logger.debug(f"Error scanning {table_env} for connection: {e}")
     return None
@@ -545,7 +554,9 @@ def _detach_connection(connection_id: str):
                 Key={"uuid": item["uuid"]},
                 UpdateExpression="REMOVE connection_id",
             )
-            logger.info(f"Detached connection {connection_id} from entity {item['uuid']}")
+            logger.info(
+                f"Detached connection {connection_id} from entity {item['uuid']}"
+            )
     except Exception as e:
         logger.error(f"Error detaching connection from thing table: {e}")
 
@@ -561,7 +572,9 @@ def _detach_connection(connection_id: str):
                 Key={"uuid": item["uuid"]},
                 UpdateExpression="REMOVE connection_id",
             )
-            logger.info(f"Detached connection {connection_id} from location entity {item['uuid']}")
+            logger.info(
+                f"Detached connection {connection_id} from location entity {item['uuid']}"
+            )
     except Exception as e:
         logger.error(f"Error detaching connection from location table: {e}")
 
@@ -577,7 +590,9 @@ def _detach_connection(connection_id: str):
                 Key={"uuid": item["uuid"]},
                 UpdateExpression="REMOVE connection_id",
             )
-            logger.info(f"Detached connection {connection_id} from land entity {item['uuid']}")
+            logger.info(
+                f"Detached connection {connection_id} from land entity {item['uuid']}"
+            )
     except Exception as e:
         logger.error(f"Error detaching connection from land table: {e}")
 
@@ -586,9 +601,11 @@ def _detach_connection(connection_id: str):
 # LocalStack health check
 # ---------------------------------------------------------------------------
 
+
 async def wait_for_localstack():
     """Wait until LocalStack DynamoDB is ready."""
     import boto3
+
     endpoint = os.environ.get("LOCALSTACK_ENDPOINT", "http://localhost:4566")
     logger.info(f"Waiting for LocalStack at {endpoint}...")
 
@@ -626,13 +643,16 @@ async def wait_for_localstack():
 # Ensure origin world exists
 # ---------------------------------------------------------------------------
 
+
 def ensure_origin_world():
     """Create the origin land tile (0,0,0) if it doesn't exist."""
     try:
         origin_uuid = Land.by_coordinates((0, 0, 0))
         origin = Land(uuid=origin_uuid)
         if not origin.description:
-            origin.description = "The starting point. A crossroads of paths stretching into the unknown."
+            origin.description = (
+                "The starting point. A crossroads of paths stretching into the unknown."
+            )
         logger.info(f"Origin land exists: {origin_uuid}")
 
         # Ensure exits from origin
@@ -650,7 +670,9 @@ def ensure_origin_world():
         logger.info(f"Creating origin world: {e}")
         origin = Land()
         origin.coordinates = (0, 0, 0)
-        origin.data["description"] = "The starting point. A crossroads of paths stretching into the unknown."
+        origin.data["description"] = (
+            "The starting point. A crossroads of paths stretching into the unknown."
+        )
         origin._save()
         logger.info(f"Created origin land: {origin.uuid}")
 
@@ -658,6 +680,7 @@ def ensure_origin_world():
 # ---------------------------------------------------------------------------
 # App factory
 # ---------------------------------------------------------------------------
+
 
 def create_app():
     """Create the aiohttp application."""
@@ -708,8 +731,8 @@ async def main():
     logger.info(f"  WebSocket: ws://{host}:{port}/ws")
     logger.info(f"  Health: http://{host}:{port}/health")
     logger.info("")
-    logger.info("Dev login: POST /api/auth/login with {\"token\": \"dev\"}")
-    logger.info("Dev bot:   POST /api/auth/login with {\"api_key\": \"dev\"}")
+    logger.info('Dev login: POST /api/auth/login with {"token": "dev"}')
+    logger.info('Dev bot:   POST /api/auth/login with {"api_key": "dev"}')
 
     # Keep running
     try:
