@@ -1,7 +1,8 @@
 """Tests for the suggestion system."""
 
-import boto3
 import os
+
+import boto3
 import pytest
 from moto import mock_aws
 

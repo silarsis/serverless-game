@@ -35,8 +35,9 @@ class Suggestion(Location):
         author_name = self.data.get("name", self.uuid[:8])
 
         # Create the suggestion as a new entity in the suggestion table
-        from .aws_client import get_dynamodb_table
         from uuid import uuid4
+
+        from .aws_client import get_dynamodb_table
 
         suggestion_id = str(uuid4())
         table = get_dynamodb_table("SUGGESTION_TABLE")
