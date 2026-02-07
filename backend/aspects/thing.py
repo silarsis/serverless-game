@@ -304,6 +304,39 @@ class Thing(UserDict):
             self.push_event(result)
         return result
 
+    def broadcast_location_event(self, event: Dict) -> None:
+        """Broadcast an event to all connected entities at the same location as this entity.
+
+        Requires the entity to have a 'location' field in its data.
+        Skips self.
+        """
+        location_uuid = self.data.get("location")
+        if not location_uuid:
+            return
+
+        # Import here to avoid circular imports
+        from aspects.aws_client import get_dynamodb_table
+
+        table = get_dynamodb_table("LOCATION_TABLE")
+        try:
+            from boto3.dynamodb.conditions import Key
+
+            result = table.query(
+                IndexName="contents",
+                Select="ALL_PROJECTED_ATTRIBUTES",
+                KeyConditionExpression=Key("location").eq(location_uuid),
+            )
+            for item in result.get("Items", []):
+                if item["uuid"] == self.uuid:
+                    continue
+                try:
+                    entity = Thing(uuid=item["uuid"])
+                    entity.push_event(event)
+                except (KeyError, Exception):
+                    pass
+        except Exception as e:
+            logging.debug(f"Could not broadcast to location {location_uuid}: {e}")
+
     def _sendEvent(self, event: EventType) -> str:
         """Send an event to the SNS topic with current object's tid and uuid."""
         sendEvent: Dict = {

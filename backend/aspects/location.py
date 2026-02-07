@@ -1,11 +1,14 @@
 """Location module for handling location-aware entities and exits."""
 
+import logging
 from typing import Dict, List, Optional
 
 from boto3.dynamodb.conditions import Key
 
 from aspects.handler import lambdaHandler
 from aspects.thing import IdType, Thing, callable
+
+logger = logging.getLogger(__name__)
 
 ExitsType = Dict[str, IdType]
 
@@ -54,9 +57,49 @@ class Location(Thing):
 
     @location.setter
     def location(self, loc_id: IdType):
-        """Set the location ID for this item."""
+        """Set the location ID for this item, notifying both locations."""
+        old_location = self.data.get("location")
         self.data["location"] = loc_id
         self._save()
+
+        entity_name = self.data.get("name", self.uuid[:8])
+
+        # Notify departure from old location
+        if old_location and old_location != loc_id:
+            self._notify_location(
+                old_location,
+                {
+                    "type": "depart",
+                    "actor": entity_name,
+                    "actor_uuid": self.uuid,
+                },
+            )
+
+        # Notify arrival at new location
+        if loc_id and loc_id != old_location:
+            self._notify_location(
+                loc_id,
+                {
+                    "type": "arrive",
+                    "actor": entity_name,
+                    "actor_uuid": self.uuid,
+                },
+            )
+
+    def _notify_location(self, location_uuid: IdType, event: dict):
+        """Push an event to all connected entities at a location, except self."""
+        try:
+            loc = Location(uuid=location_uuid)
+            for entity_uuid in loc.contents:
+                if entity_uuid == self.uuid:
+                    continue
+                try:
+                    entity = Thing(uuid=entity_uuid)
+                    entity.push_event(event)
+                except (KeyError, Exception):
+                    pass
+        except (KeyError, Exception):
+            pass
 
     @callable
     def create(self) -> None:

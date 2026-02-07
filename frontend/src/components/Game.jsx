@@ -78,6 +78,20 @@ const Game = () => {
       message = { command: "move", data: { direction: action } };
     } else if (action === "look" || action === "l") {
       message = { command: "look", data: {} };
+    } else if (action === "say" || action === "'") {
+      message = { command: "say", data: { message: args.join(" ") } };
+    } else if (action === "whisper" || action === "tell") {
+      message = { command: "whisper", data: { target_uuid: args[0], message: args.slice(1).join(" ") } };
+    } else if (action === "emote" || action === ":") {
+      message = { command: "emote", data: { action: args.join(" ") } };
+    } else if (action === "take" || action === "get" || action === "pick") {
+      message = { command: "take", data: { item_uuid: args[0] } };
+    } else if (action === "drop") {
+      message = { command: "drop", data: { item_uuid: args[0] } };
+    } else if (action === "examine" || action === "x") {
+      message = { command: "examine", data: { item_uuid: args[0] } };
+    } else if (action === "inventory" || action === "inv" || action === "i") {
+      message = { command: "inventory", data: {} };
     } else {
       message = { command: action, data: args.length ? { text: args.join(" ") } : {} };
     }
@@ -145,6 +159,67 @@ const Game = () => {
             {event.exits?.length > 0 && (
               <div style={styles.exits}>Exits: {event.exits.join(", ")}</div>
             )}
+          </div>
+        );
+      case "say":
+        return (
+          <div key={index} style={styles.say}>
+            {event.speaker} says: &ldquo;{event.message}&rdquo;
+          </div>
+        );
+      case "say_confirm":
+        return <div key={index} style={styles.sayConfirm}>{event.message}</div>;
+      case "whisper":
+        return (
+          <div key={index} style={styles.whisper}>
+            {event.speaker} whispers: &ldquo;{event.message}&rdquo;
+          </div>
+        );
+      case "whisper_confirm":
+        return <div key={index} style={styles.whisperConfirm}>{event.message}</div>;
+      case "emote":
+        return (
+          <div key={index} style={styles.emote}>
+            {event.actor} {event.action}
+          </div>
+        );
+      case "emote_confirm":
+        return <div key={index} style={styles.emote}>{event.message}</div>;
+      case "arrive":
+        return <div key={index} style={styles.arrive}>{event.actor} arrives.</div>;
+      case "depart":
+        return (
+          <div key={index} style={styles.depart}>
+            {event.actor} leaves {event.direction || "the area"}.
+          </div>
+        );
+      case "take_confirm":
+      case "drop_confirm":
+        return <div key={index} style={styles.itemAction}>{event.message}</div>;
+      case "take":
+      case "drop":
+        return (
+          <div key={index} style={styles.itemAction}>
+            {event.actor} {event.type === "take" ? "picks up" : "drops"} {event.item}.
+          </div>
+        );
+      case "examine":
+        return (
+          <div key={index} style={styles.examine}>
+            <div style={styles.itemName}>{event.name}</div>
+            <div>{event.description}</div>
+          </div>
+        );
+      case "inventory":
+        return (
+          <div key={index} style={styles.inventory}>
+            <div>You are carrying ({event.count} items):</div>
+            {event.items?.map((item, i) => (
+              <div key={i} style={styles.inventoryItem}>
+                &nbsp;&nbsp;{item.name} [{item.uuid.slice(0, 8)}]
+              </div>
+            ))}
+            {event.count === 0 && <div>&nbsp;&nbsp;Nothing.</div>}
           </div>
         );
       default:
@@ -235,6 +310,18 @@ const styles = {
   exits: { color: "#81c784", fontSize: "13px" },
   coords: { color: "#666", fontSize: "11px" },
   move: { marginBottom: "8px", color: "#b0bec5" },
+  say: { color: "#fff176", marginBottom: "4px" },
+  sayConfirm: { color: "#fff9c4", marginBottom: "4px" },
+  whisper: { color: "#ce93d8", marginBottom: "4px", fontStyle: "italic" },
+  whisperConfirm: { color: "#e1bee7", marginBottom: "4px", fontStyle: "italic" },
+  emote: { color: "#ffab91", marginBottom: "4px" },
+  arrive: { color: "#a5d6a7", marginBottom: "4px" },
+  depart: { color: "#90a4ae", marginBottom: "4px" },
+  itemAction: { color: "#80cbc4", marginBottom: "4px" },
+  examine: { marginBottom: "8px", color: "#b39ddb" },
+  itemName: { fontWeight: "bold", marginBottom: "2px" },
+  inventory: { marginBottom: "8px", color: "#80deea" },
+  inventoryItem: { color: "#b2ebf2" },
   raw: { color: "#ccc", marginBottom: "4px" },
   inputRow: {
     display: "flex",
