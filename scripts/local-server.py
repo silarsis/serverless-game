@@ -237,21 +237,37 @@ def dev_api_key_login(api_key: str) -> dict:
 
 
 def get_or_create_player_entity(user_id: str, name: str = "Player") -> dict:
-    """Get or create a player entity at the origin.
+    """Get or create a mobile player entity located at the origin room.
 
-    Players possess the origin Land tile directly so they inherit its
-    coordinates, exits, and description. The player's name is stored on
-    the entity.
+    The player entity is a Land record whose ``location`` field points to
+    the room it is currently in.  ``look()`` and ``move()`` on Land now
+    resolve the current room via ``_current_room()`` so the player
+    navigates the map correctly.
     Returns {uuid, aspect} for the possess command.
     """
+    import uuid as uuid_module
+
+    entity_uuid = str(uuid_module.uuid5(uuid_module.NAMESPACE_DNS, "player-" + user_id))
+
+    # Try to load existing player entity
+    try:
+        entity = Land(uuid=entity_uuid)
+        logger.info(f"Found existing player entity {entity_uuid}")
+        return {"uuid": entity_uuid, "aspect": "Land"}
+    except (KeyError, Exception):
+        pass
+
+    # Create new player entity at the origin room
     origin_uuid = Land.by_coordinates((0, 0, 0))
-    entity = Land(uuid=origin_uuid)
-    # Tag with player name if not already set
-    if not entity.data.get("name"):
-        entity.data["name"] = name
-        entity._save()
-    logger.info(f"Player {user_id} ({name}) possessing origin {origin_uuid}")
-    return {"uuid": origin_uuid, "aspect": "Land"}
+    logger.info(f"Creating player entity {entity_uuid} at origin {origin_uuid}")
+    entity = Land()  # creates with a random UUID
+    entity.data["uuid"] = entity_uuid  # override to our deterministic UUID
+    entity.data["name"] = name
+    entity.data["location"] = origin_uuid
+    entity.data["coordinates"] = Land._convertCoordinatesForStorage((0, 0, 0))
+    entity.data["exits"] = {}
+    entity._save()
+    return {"uuid": entity_uuid, "aspect": "Land"}
 
 
 # ---------------------------------------------------------------------------
@@ -655,13 +671,25 @@ def ensure_origin_world():
             )
         logger.info(f"Origin land exists: {origin_uuid}")
 
-        # Ensure exits from origin
+        # Ensure exits from origin (bidirectional)
+        opposite = {
+            "north": "south",
+            "south": "north",
+            "east": "west",
+            "west": "east",
+            "up": "down",
+            "down": "up",
+        }
         if not origin.exits:
             for direction in ["north", "south", "east", "west"]:
                 try:
                     new_coord = Land._new_coords_by_direction((0, 0, 0), direction)
                     dest_uuid = Land.by_coordinates(new_coord)
                     origin.add_exit(direction, dest_uuid)
+                    # Add return exit on the neighbor back to origin
+                    neighbor = Land(uuid=dest_uuid)
+                    if opposite[direction] not in neighbor.exits:
+                        neighbor.add_exit(opposite[direction], origin.uuid)
                 except Exception as e:
                     logger.debug(f"Could not create exit {direction}: {e}")
             logger.info(f"Created exits from origin: {list(origin.exits.keys())}")

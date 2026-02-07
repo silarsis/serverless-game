@@ -136,17 +136,66 @@ class Land(Location):
         self.data["description"] = value
         self._save()
 
+    def _current_room(self) -> "Land":
+        """Return the room the player is currently in.
+
+        If this entity has a ``location`` pointing to another Land tile,
+        load and return that room.  Otherwise ``self`` *is* the room.
+        """
+        loc = self.data.get("location")
+        if loc and loc != self.uuid:
+            try:
+                return Land(uuid=loc)
+            except KeyError:
+                pass
+        return self
+
     @player_command
     def look(self) -> dict:
         """Look around the current location."""
-        desc = self.description or f"An empty stretch of land at {self.coordinates}."
+        room = self._current_room()
+        desc = room.description or f"An empty stretch of land at {room.coordinates}."
         return {
             "type": "look",
             "description": desc,
-            "coordinates": list(self.coordinates),
-            "exits": list(self.exits.keys()),
-            "contents": self.contents,
+            "coordinates": list(room.coordinates),
+            "exits": list(room.exits.keys()),
+            "contents": room.contents,
         }
+
+    _OPPOSITE = {
+        "north": "south",
+        "south": "north",
+        "east": "west",
+        "west": "east",
+        "up": "down",
+        "down": "up",
+    }
+
+    def _ensure_exits(self, room: "Land") -> None:
+        """Ensure a room has exits in all cardinal directions.
+
+        When a player arrives in a room, we fill in any missing cardinal
+        exits (and add a return exit on each new neighbor).  This makes
+        the world infinitely explorable — every room you visit gets
+        connected to its four cardinal neighbors.
+        """
+        for direction in ["north", "south", "east", "west"]:
+            if direction in room.exits:
+                continue
+            try:
+                new_coord = Land._new_coords_by_direction(
+                    room.coordinates, direction
+                )
+                dest_uuid = Land.by_coordinates(new_coord)
+                room.add_exit(direction, dest_uuid)
+                # Ensure return exit on the neighbor
+                neighbor = Land(uuid=dest_uuid)
+                reverse = self._OPPOSITE[direction]
+                if reverse not in neighbor.exits:
+                    neighbor.add_exit(reverse, room.uuid)
+            except Exception:
+                pass
 
     @player_command
     def move(self, direction: str) -> dict:
@@ -161,16 +210,19 @@ class Land(Location):
         if direction not in valid_directions:
             return {"type": "error", "message": f"Invalid direction: {direction}"}
 
-        if direction not in self.exits:
+        room = self._current_room()
+        if direction not in room.exits:
             return {"type": "error", "message": f"There is no exit to the {direction}."}
 
-        dest_uuid = self.exits[direction]
-        # Update the entity's location to the destination
+        dest_uuid = room.exits[direction]
+        # Update the player's location to the destination
         self.data["location"] = dest_uuid
         self._save()
 
-        # Load destination and return its info
+        # Load destination and auto-generate exits if needed
         dest = Land(uuid=dest_uuid)
+        self._ensure_exits(dest)
+
         desc = dest.description or f"An empty stretch of land at {dest.coordinates}."
         return {
             "type": "move",
