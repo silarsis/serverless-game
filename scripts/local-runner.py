@@ -27,8 +27,13 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "backend"))
 import boto3
 from dotenv import load_dotenv
 
-from aspects import land, landCreator, location, thing
-from aspects.handler import lambdaHandler
+from aspects import land, landCreator, location, thing  # noqa: F401
+from aspects.handler import lambdaHandler  # noqa: F401
+
+try:
+    from aspects import communication, inventory, npc  # noqa: F401
+except ImportError:
+    communication = inventory = npc = None
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -88,6 +93,12 @@ def invoke_handler(aspect_name: str, event: Dict[str, Any]):
         "Land": land,
         "LandCreator": landCreator,
     }
+    if communication:
+        aspect_map["Communication"] = communication
+    if inventory:
+        aspect_map["Inventory"] = inventory
+    if npc:
+        aspect_map["NPC"] = npc
 
     module = aspect_map.get(aspect_name)
     if not module:

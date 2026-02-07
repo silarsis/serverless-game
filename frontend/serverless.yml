@@ -12,6 +12,7 @@ custom:
     defaultRegion: ap-southeast-1
     client:
         bucketName: serverless-game-${self:provider.stage}.bofh.net.au
+        distributionFolder: dist
 
 provider:
     name: aws

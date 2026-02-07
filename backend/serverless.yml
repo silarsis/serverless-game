@@ -17,6 +17,7 @@ custom:
     landName: 'land-table-${self:provider.stage}'
     usersName: 'users-${self:provider.stage}'
     apiKeysName: 'api-keys-${self:provider.stage}'
+    suggestionName: 'suggestion-${self:provider.stage}'
   topics:
     thingName: 'thing-topic-${self:provider.stage}'
   MessageDelayerName: 'message-delayer-${self:provider.stage}'
@@ -43,6 +44,7 @@ provider:
         - { "Fn::GetAtt": ["LandDynamoDBTable", "Arn" ] }
         - { "Fn::GetAtt": ["UsersDynamoDBTable", "Arn" ] }
         - { "Fn::GetAtt": ["ApiKeysDynamoDBTable", "Arn" ] }
+        - { "Fn::GetAtt": ["SuggestionDynamoDBTable", "Arn" ] }
     - Effect: Allow
       Action:
         - states:StartExecution
@@ -59,6 +61,7 @@ provider:
     LAND_TABLE: ${self:custom.tables.landName}
     THING_TOPIC_ARN: !Ref ThingTopic
     MESSAGE_DELAYER_ARN: !Ref MessageDelayer
+    SUGGESTION_TABLE: ${self:custom.tables.suggestionName}
     DD_TRACE_AGENT_URL: 'https://ingest.lightstep.com:443'
     DD_TRACE_GLOBAL_TAGS: "lightstep.service_name:serverless-game,lightstep.access_token:${param:lightstep_access_token}"
 
@@ -241,6 +244,23 @@ functions:
           filterPolicy:
             aspect:
               - NPC
+
+  suggestion:
+    handler: aspects/suggestion.handler
+    VpcId:
+      Ref:
+        Fn::ImportValue: VpcId
+    package:
+      exclude:
+        - ./**
+      include:
+        - aspects/**
+    events:
+      - sns:
+          arn: "arn:aws:sns:#{AWS::Region}:#{AWS::AccountId}:${self:custom.topics.thingName}"
+          filterPolicy:
+            aspect:
+              - Suggestion
 
 resources:
   Resources:
@@ -456,6 +476,21 @@ resources:
           ReadCapacityUnits: 1
           WriteCapacityUnits: 1
         TableName: ${self:custom.tables.landName}
+
+    SuggestionDynamoDBTable:
+      Type: 'AWS::DynamoDB::Table'
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: uuid
+            AttributeType: S
+        KeySchema:
+          - AttributeName: uuid
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        TableName: ${self:custom.tables.suggestionName}
+
   Outputs:
     ThingTopic:
       Value: !Ref ThingTopic

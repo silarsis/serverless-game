@@ -304,6 +304,55 @@ class Thing(UserDict):
             self.push_event(result)
         return result
 
+    @callable
+    def help(self, command=None) -> dict:
+        """List available commands, or get details on a specific command.
+
+        Args:
+            command: Optional command name to get details for.
+
+        Returns:
+            dict with help info.
+        """
+        commands = {}
+        for cls in type(self).__mro__:
+            for attr_name in vars(cls):
+                if attr_name.startswith("_"):
+                    continue
+                attr = getattr(cls, attr_name, None)
+                if attr is None:
+                    continue
+                if hasattr(attr, "_is_player_command") and attr._is_player_command:
+                    if attr_name not in commands:
+                        doc = getattr(attr, "__doc__", "") or ""
+                        first_line = doc.strip().split("\n")[0] if doc.strip() else "No description."
+                        commands[attr_name] = {
+                            "name": attr_name,
+                            "summary": first_line,
+                            "doc": doc.strip(),
+                        }
+
+        if command:
+            cmd_info = commands.get(command)
+            if cmd_info:
+                return {
+                    "type": "help_detail",
+                    "command": command,
+                    "description": cmd_info["doc"],
+                }
+            return {"type": "error", "message": f"Unknown command: {command}"}
+
+        return {
+            "type": "help",
+            "commands": [
+                {"name": c["name"], "summary": c["summary"]}
+                for c in sorted(commands.values(), key=lambda x: x["name"])
+            ],
+        }
+
+    # Mark help as a player command (can't use @player_command decorator due to import cycle)
+    help._is_player_command = True
+
     def broadcast_location_event(self, event: Dict) -> None:
         """Broadcast an event to all connected entities at the same location as this entity.
 

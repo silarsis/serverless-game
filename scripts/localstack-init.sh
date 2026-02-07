@@ -70,6 +70,14 @@ aws --endpoint-url=$LOCALSTACK_ENDPOINT dynamodb create-table \
     --provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5 \
     --region ap-southeast-1 2>/dev/null || echo "api-keys-local already exists"
 
+# Suggestion Table
+aws --endpoint-url=$LOCALSTACK_ENDPOINT dynamodb create-table \
+    --table-name suggestion-table-local \
+    --attribute-definitions AttributeName=uuid,AttributeType=S \
+    --key-schema AttributeName=uuid,KeyType=HASH \
+    --provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5 \
+    --region ap-southeast-1 2>/dev/null || echo "suggestion-table-local already exists"
+
 echo "Creating SNS topic..."
 THING_TOPIC_ARN=$(aws --endpoint-url=$LOCALSTACK_ENDPOINT sns create-topic \
     --name thing-topic-local \
@@ -180,6 +188,7 @@ echo "  - location-table-local"
 echo "  - land-table-local"
 echo "  - users-local"
 echo "  - api-keys-local"
+echo "  - suggestion-table-local"
 echo ""
 echo "SNS Topic ARN:"
 echo "  $THING_TOPIC_ARN"

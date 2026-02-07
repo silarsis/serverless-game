@@ -2,16 +2,18 @@
 """Reference AI agent for the serverless game.
 
 Authenticates via API key, connects to WebSocket, possesses an entity,
-and interacts with the world using the same interface as human players.
+explores the world, and periodically submits suggestions based on what
+it encounters.
 
 Usage:
     python ai_agent.py --api-key YOUR_API_KEY --api-url https://your-api.com
-    python ai_agent.py --api-key YOUR_API_KEY --api-url http://localhost:4566
+    python ai_agent.py --api-key dev --api-url http://localhost:8000
 """
 
 import argparse
 import json
 import logging
+import random
 import sys
 import time
 from urllib.parse import urlencode
@@ -27,7 +29,7 @@ def authenticate(api_url: str, api_key: str) -> dict:
         api_key: API key for bot authentication.
 
     Returns:
-        dict with jwt and user info.
+        dict with jwt, user info, and optionally entity info.
     """
     import urllib.request
 
@@ -46,16 +48,40 @@ def authenticate(api_url: str, api_key: str) -> dict:
     return result
 
 
-class GameBot:
-    """A simple AI agent that explores the world."""
+# ---------------------------------------------------------------------------
+# Suggestion templates — used when the agent doesn't have an LLM available
+# ---------------------------------------------------------------------------
 
-    def __init__(self, jwt: str, entity_uuid: str, ws_url: str):
+SUGGESTION_TEMPLATES = [
+    "It would be nice if there were weather effects that change the room descriptions",
+    "A day/night cycle would make exploration more interesting",
+    "Allow players to leave notes or signs in rooms for others to find",
+    "Add ambient sounds or text-based atmosphere descriptions",
+    "Let entities build simple structures at locations",
+    "A map command that shows explored areas would be helpful",
+    "Trading or bartering between entities would add interaction depth",
+    "Quests or objectives that generate dynamically from the world state",
+    "Allow customizing your entity's appearance and description",
+    "Add a journal or log command to review what happened recently",
+    "It would be fun to have seasonal events or changes",
+    "Allow naming locations so you can navigate by name",
+    "Portals or fast-travel between distant locations",
+    "Riddles or puzzles in some rooms for extra rewards",
+    "The ability to plant seeds and grow things over time",
+]
+
+
+class GameBot:
+    """An AI agent that explores the world and submits suggestions."""
+
+    def __init__(self, jwt: str, entity_uuid: str, ws_url: str, suggest_interval: int = 10):
         """Initialize the bot.
 
         Args:
             jwt: Internal JWT from authentication.
-            entity_uuid: UUID of the entity to possess.
+            entity_uuid: UUID of the entity to possess (empty to auto-create).
             ws_url: WebSocket URL of the game server.
+            suggest_interval: Rooms explored between suggestions.
         """
         self.jwt = jwt
         self.entity_uuid = entity_uuid
@@ -65,6 +91,10 @@ class GameBot:
         self.command_history = []
         self.current_location = None
         self.available_exits = []
+        self.rooms_explored = 0
+        self.suggest_interval = suggest_interval
+        self.suggestions_made = set()
+        self.known_suggestions = []
 
     def connect(self):
         """Connect to the game WebSocket."""
@@ -88,9 +118,15 @@ class GameBot:
     def _on_open(self, ws):
         """Handle WebSocket connection opened."""
         logger.info("Connected to game server")
-        # Possess our entity
-        self._send_command("possess", entity_uuid=self.entity_uuid, entity_aspect="Land")
+        # Possess our entity (or let server auto-create)
+        if self.entity_uuid:
+            self._send_command("possess", entity_uuid=self.entity_uuid, entity_aspect="Land")
+        else:
+            self._send_command("possess")
         time.sleep(0.5)
+        # Discover commands
+        self._send_command("help")
+        time.sleep(0.3)
         # Look around
         self._send_command("look")
 
@@ -103,7 +139,7 @@ class GameBot:
             return
 
         event_type = event.get("type", "unknown")
-        logger.info(f"Event: {event_type} - {json.dumps(event, indent=2)}")
+        logger.info(f"Event: {event_type} - {json.dumps(event, indent=2)[:200]}")
 
         # React to events
         if event_type == "look":
@@ -114,6 +150,10 @@ class GameBot:
             self._handle_say(event)
         elif event_type == "arrive":
             self._handle_arrive(event)
+        elif event_type == "help":
+            self._handle_help(event)
+        elif event_type == "suggestions":
+            self._handle_suggestions_list(event)
         elif event_type == "error":
             logger.warning(f"Error from server: {event.get('message')}")
 
@@ -139,18 +179,26 @@ class GameBot:
         self.current_location = event.get("coordinates")
         self.available_exits = event.get("exits", [])
         desc = event.get("description", "")
-        logger.info(f"Location: {self.current_location} - {desc}")
-        logger.info(f"Exits: {self.available_exits}")
+        logger.info(f"Location: {self.current_location} - {desc[:80]}")
 
-        # Simple exploration: pick a random exit and move
+        # Explore
         self._explore()
 
     def _handle_move(self, event):
         """Process movement results."""
         self.current_location = event.get("coordinates")
         self.available_exits = event.get("exits", [])
-        desc = event.get("description", "")
-        logger.info(f"Moved to: {self.current_location} - {desc}")
+        self.rooms_explored += 1
+
+        logger.info(f"Moved to: {self.current_location} (rooms explored: {self.rooms_explored})")
+
+        # Maybe submit a suggestion
+        if self.rooms_explored % self.suggest_interval == 0:
+            self._maybe_suggest()
+
+        # Maybe check existing suggestions and vote
+        if self.rooms_explored % (self.suggest_interval * 2) == 0:
+            self._check_and_vote()
 
         # Continue exploring after a delay
         time.sleep(2)
@@ -163,19 +211,38 @@ class GameBot:
         logger.info(f'{speaker} says: "{message}"')
 
         # Simple response: greet back
-        if any(word in message.lower() for word in ["hello", "hi", "greet", "met"]):
-            self._send_command("say", message=f"Hello, {speaker}! I'm just exploring.")
+        if any(word in message.lower() for word in ["hello", "hi", "greet", "hey"]):
+            self._send_command("say", message=f"Hello, {speaker}! I'm exploring and looking for ideas.")
+        elif "suggest" in message.lower():
+            self._send_command("say", message="Good idea! Use 'suggest <idea>' to share it.")
 
     def _handle_arrive(self, event):
         """React to someone arriving at our location."""
         actor = event.get("actor", "someone")
         logger.info(f"{actor} arrives.")
-        self._send_command("say", message=f"Hello there, {actor}!")
+        self._send_command("say", message=f"Welcome, {actor}! Seen anything interesting?")
+
+    def _handle_help(self, event):
+        """Log available commands."""
+        commands = event.get("commands", [])
+        cmd_names = [c["name"] for c in commands]
+        logger.info(f"Available commands: {', '.join(cmd_names)}")
+
+    def _handle_suggestions_list(self, event):
+        """Process suggestions list for voting."""
+        self.known_suggestions = event.get("suggestions", [])
+        logger.info(f"Received {len(self.known_suggestions)} suggestions")
+
+        # Vote for a random suggestion we haven't voted for yet
+        unvoted = [s for s in self.known_suggestions if s["uuid"] not in self.suggestions_made]
+        if unvoted:
+            pick = random.choice(unvoted)
+            logger.info(f"Voting for: {pick['text'][:60]}")
+            self._send_command("vote", suggestion_uuid=pick["uuid"])
+            self.suggestions_made.add(pick["uuid"])
 
     def _explore(self):
         """Pick a direction and move."""
-        import random
-
         if not self.available_exits:
             logger.info("No exits available, waiting...")
             time.sleep(5)
@@ -186,6 +253,24 @@ class GameBot:
         logger.info(f"Exploring: moving {direction}")
         self._send_command("move", direction=direction)
 
+    def _maybe_suggest(self):
+        """Submit a suggestion based on exploration experience."""
+        # Pick a template we haven't used
+        unused = [t for t in SUGGESTION_TEMPLATES if t not in self.suggestions_made]
+        if not unused:
+            logger.info("Used all suggestion templates")
+            return
+
+        suggestion_text = random.choice(unused)
+        self.suggestions_made.add(suggestion_text)
+        logger.info(f"Submitting suggestion: {suggestion_text[:60]}")
+        self._send_command("suggest", text=suggestion_text)
+
+    def _check_and_vote(self):
+        """Fetch existing suggestions and vote on one."""
+        logger.info("Checking existing suggestions...")
+        self._send_command("suggestions")
+
 
 def main():
     """Run the AI agent."""
@@ -193,7 +278,7 @@ def main():
     parser.add_argument("--api-key", required=True, help="API key for bot authentication")
     parser.add_argument(
         "--api-url",
-        default="http://localhost:4566",
+        default="http://localhost:8000",
         help="Base URL of the game API",
     )
     parser.add_argument(
@@ -204,7 +289,13 @@ def main():
     parser.add_argument(
         "--entity-uuid",
         default=None,
-        help="UUID of entity to possess (creates new if not set)",
+        help="UUID of entity to possess (auto-creates if not set)",
+    )
+    parser.add_argument(
+        "--suggest-interval",
+        type=int,
+        default=10,
+        help="Number of rooms explored between suggestions (default: 10)",
     )
     parser.add_argument("--verbose", "-v", action="store_true", help="Enable debug logging")
     args = parser.parse_args()
@@ -217,23 +308,31 @@ def main():
     # Authenticate
     auth_result = authenticate(args.api_url, args.api_key)
     jwt = auth_result["jwt"]
-    entity_uuid = args.entity_uuid or auth_result["user"].get("entity_uuid", "")
 
-    if not entity_uuid:
-        logger.error("No entity UUID provided and none returned from auth. Use --entity-uuid.")
-        sys.exit(1)
+    # Get entity UUID from auth response or args
+    entity_uuid = args.entity_uuid
+    if not entity_uuid and "entity" in auth_result:
+        entity_uuid = auth_result["entity"].get("uuid", "")
 
     # Determine WebSocket URL
     ws_url = args.ws_url
     if not ws_url:
-        # Default: assume same host as API but with wss:// scheme
         ws_url = args.api_url.replace("http://", "ws://").replace("https://", "wss://")
         ws_url = ws_url.rstrip("/") + "/ws"
 
     logger.info(f"Connecting to {ws_url}")
+    if entity_uuid:
+        logger.info(f"Will possess entity {entity_uuid}")
+    else:
+        logger.info("Will auto-create entity on possess")
 
     # Connect and run
-    bot = GameBot(jwt=jwt, entity_uuid=entity_uuid, ws_url=ws_url)
+    bot = GameBot(
+        jwt=jwt,
+        entity_uuid=entity_uuid or "",
+        ws_url=ws_url,
+        suggest_interval=args.suggest_interval,
+    )
     try:
         bot.connect()
     except KeyboardInterrupt:

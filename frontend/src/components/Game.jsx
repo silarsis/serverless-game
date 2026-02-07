@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 
-const WS_URL = process.env.REACT_APP_WS_URL || "ws://localhost:4566";
+const WS_URL = import.meta.env.VITE_WS_URL || "ws://localhost:8000/ws";
 
-const Game = () => {
+const Game = ({ onShowGuide }) => {
   const [events, setEvents] = useState([]);
   const [command, setCommand] = useState("");
   const [connected, setConnected] = useState(false);
@@ -25,6 +25,20 @@ const Game = () => {
     ws.onopen = () => {
       setConnected(true);
       addEvent({ type: "system", message: "Connected to server." });
+      // Auto-possess stored entity
+      const entityStr = window.localStorage.getItem("entity");
+      if (entityStr) {
+        try {
+          const entity = JSON.parse(entityStr);
+          ws.send(JSON.stringify({
+            command: "possess",
+            data: { entity_uuid: entity.uuid, entity_aspect: entity.aspect || "Land" },
+          }));
+        } catch { /* ignore */ }
+      } else {
+        // No entity stored — let server auto-create one
+        ws.send(JSON.stringify({ command: "possess", data: {} }));
+      }
     };
 
     ws.onmessage = (e) => {
@@ -92,6 +106,14 @@ const Game = () => {
       message = { command: "examine", data: { item_uuid: args[0] } };
     } else if (action === "inventory" || action === "inv" || action === "i") {
       message = { command: "inventory", data: {} };
+    } else if (action === "help" || action === "?") {
+      message = { command: "help", data: args.length ? { command: args[0] } : {} };
+    } else if (action === "suggest") {
+      message = { command: "suggest", data: { text: args.join(" ") } };
+    } else if (action === "suggestions") {
+      message = { command: "suggestions", data: args.length ? { status: args[0] } : {} };
+    } else if (action === "vote") {
+      message = { command: "vote", data: { suggestion_uuid: args[0] } };
     } else {
       message = { command: action, data: args.length ? { text: args.join(" ") } : {} };
     }
@@ -222,6 +244,44 @@ const Game = () => {
             {event.count === 0 && <div>&nbsp;&nbsp;Nothing.</div>}
           </div>
         );
+      case "help":
+        return (
+          <div key={index} style={styles.help}>
+            <div style={styles.helpTitle}>Available commands:</div>
+            {event.commands?.map((cmd, i) => (
+              <div key={i} style={styles.helpRow}>
+                <span style={styles.helpCmd}>{cmd.name}</span>
+                <span style={styles.helpDesc}> - {cmd.summary}</span>
+              </div>
+            ))}
+            <div style={styles.helpHint}>Type &quot;help &lt;command&gt;&quot; for details.</div>
+          </div>
+        );
+      case "help_detail":
+        return (
+          <div key={index} style={styles.help}>
+            <div style={styles.helpTitle}>{event.command}</div>
+            <pre style={styles.helpDetail}>{event.description}</pre>
+          </div>
+        );
+      case "suggest_confirm":
+      case "vote_confirm":
+      case "review_confirm":
+        return <div key={index} style={styles.suggest}>{event.message}</div>;
+      case "suggestions":
+        return (
+          <div key={index} style={styles.suggest}>
+            <div style={styles.suggestTitle}>Suggestions ({event.status}, {event.count}):</div>
+            {event.suggestions?.map((s, i) => (
+              <div key={i} style={styles.suggestRow}>
+                <span style={styles.suggestVotes}>[{s.votes}]</span>
+                <span> {s.text.slice(0, 80)}</span>
+                <span style={styles.suggestMeta}> — {s.author} [{s.uuid.slice(0, 8)}]</span>
+              </div>
+            ))}
+            {event.count === 0 && <div>No suggestions yet. Use &quot;suggest &lt;idea&gt;&quot; to add one!</div>}
+          </div>
+        );
       default:
         return (
           <div key={index} style={styles.raw}>
@@ -243,6 +303,7 @@ const Game = () => {
         <span style={styles.status}>
           {connected ? "Connected" : "Disconnected"}
         </span>
+        {onShowGuide && <button onClick={onShowGuide} style={styles.logout}>How to Play</button>}
         <button onClick={handleLogout} style={styles.logout}>Logout</button>
       </div>
       <div style={styles.events}>
@@ -322,6 +383,18 @@ const styles = {
   itemName: { fontWeight: "bold", marginBottom: "2px" },
   inventory: { marginBottom: "8px", color: "#80deea" },
   inventoryItem: { color: "#b2ebf2" },
+  help: { marginBottom: "8px", color: "#a5d6a7" },
+  helpTitle: { fontWeight: "bold", marginBottom: "4px", color: "#81c784" },
+  helpRow: { marginBottom: "2px", fontSize: "13px" },
+  helpCmd: { color: "#64b5f6" },
+  helpDesc: { color: "#b0bec5" },
+  helpHint: { marginTop: "6px", color: "#666", fontSize: "12px" },
+  helpDetail: { color: "#b0bec5", fontSize: "13px", whiteSpace: "pre-wrap", margin: "4px 0" },
+  suggest: { marginBottom: "8px", color: "#ffcc80" },
+  suggestTitle: { fontWeight: "bold", marginBottom: "4px", color: "#ffa726" },
+  suggestRow: { marginBottom: "2px", fontSize: "13px" },
+  suggestVotes: { color: "#81c784", fontWeight: "bold" },
+  suggestMeta: { color: "#666", fontSize: "11px" },
   raw: { color: "#ccc", marginBottom: "4px" },
   inputRow: {
     display: "flex",

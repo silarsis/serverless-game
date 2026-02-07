@@ -2,11 +2,11 @@
   "name": "serverless-game-frontend",
   "version": "1.0.0",
   "description": "React frontend for the serverless game",
-  "main": "index.js",
-  "directories": {
-    "lib": "lib"
-  },
+  "type": "module",
   "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
     "test": "/bin/true"
   },
   "repository": {
@@ -21,12 +21,11 @@
   "homepage": "https://github.com/silarsis/serverless-game#readme",
   "dependencies": {
     "@react-oauth/google": "^0.12.1",
-    "serverless": "^4.31.2",
-    "serverless-finch": "^4.0.4",
-    "serverless-pseudo-parameters": "^2.5.0",
-    "serverless-single-page-app-plugin": "^1.0.4"
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   },
   "devDependencies": {
-    "serverless-python-requirements": "^5.1.1"
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^6.0.0"
   }
 }
