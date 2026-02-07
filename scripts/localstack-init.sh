@@ -52,6 +52,24 @@ aws --endpoint-url=$LOCALSTACK_ENDPOINT dynamodb create-table \
     --provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5 \
     --region ap-southeast-1 2>/dev/null || echo "land-table-local already exists"
 
+# Users Table
+aws --endpoint-url=$LOCALSTACK_ENDPOINT dynamodb create-table \
+    --table-name users-local \
+    --attribute-definitions AttributeName=google_uid,AttributeType=S \
+    --key-schema AttributeName=google_uid,KeyType=HASH \
+    --provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5 \
+    --region ap-southeast-1 2>/dev/null || echo "users-local already exists"
+
+# API Keys Table
+aws --endpoint-url=$LOCALSTACK_ENDPOINT dynamodb create-table \
+    --table-name api-keys-local \
+    --attribute-definitions AttributeName=api_key,AttributeType=S AttributeName=google_uid,AttributeType=S \
+    --key-schema AttributeName=api_key,KeyType=HASH \
+    --global-secondary-indexes \
+        "IndexName=by-user,KeySchema=[{AttributeName=google_uid,KeyType=HASH},{AttributeName=api_key,KeyType=RANGE}],Projection={ProjectionType=ALL},ProvisionedThroughput={ReadCapacityUnits=5,WriteCapacityUnits=5}" \
+    --provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5 \
+    --region ap-southeast-1 2>/dev/null || echo "api-keys-local already exists"
+
 echo "Creating SNS topic..."
 THING_TOPIC_ARN=$(aws --endpoint-url=$LOCALSTACK_ENDPOINT sns create-topic \
     --name thing-topic-local \
@@ -160,6 +178,8 @@ echo "DynamoDB Tables:"
 echo "  - thing-table-local"
 echo "  - location-table-local"
 echo "  - land-table-local"
+echo "  - users-local"
+echo "  - api-keys-local"
 echo ""
 echo "SNS Topic ARN:"
 echo "  $THING_TOPIC_ARN"

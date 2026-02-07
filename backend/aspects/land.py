@@ -6,6 +6,7 @@ from typing import Tuple
 from boto3.dynamodb.conditions import Key
 
 from .aws_client import get_dynamodb_table
+from .decorators import player_command
 from .location import ExitsType, Location
 from .thing import IdType, callable
 
@@ -123,3 +124,58 @@ class Land(Location):
             dest = Land.by_coordinates(new_coord)
         result = super().add_exit(d, dest)
         return result
+
+    @property
+    def description(self):
+        """Get the room description, or a default based on coordinates."""
+        return self.data.get("description", "")
+
+    @description.setter
+    def description(self, value: str):
+        """Set the room description."""
+        self.data["description"] = value
+        self._save()
+
+    @player_command
+    def look(self) -> dict:
+        """Look around the current location."""
+        desc = self.description or f"An empty stretch of land at {self.coordinates}."
+        return {
+            "type": "look",
+            "description": desc,
+            "coordinates": list(self.coordinates),
+            "exits": list(self.exits.keys()),
+            "contents": self.contents,
+        }
+
+    @player_command
+    def move(self, direction: str) -> dict:
+        """Move to an adjacent location.
+
+        Args:
+            direction: The direction to move (north, south, east, west, up, down).
+        Returns:
+            dict with movement result and new location info.
+        """
+        valid_directions = ["north", "south", "east", "west", "up", "down"]
+        if direction not in valid_directions:
+            return {"type": "error", "message": f"Invalid direction: {direction}"}
+
+        if direction not in self.exits:
+            return {"type": "error", "message": f"There is no exit to the {direction}."}
+
+        dest_uuid = self.exits[direction]
+        # Update the entity's location to the destination
+        self.data["location"] = dest_uuid
+        self._save()
+
+        # Load destination and return its info
+        dest = Land(uuid=dest_uuid)
+        desc = dest.description or f"An empty stretch of land at {dest.coordinates}."
+        return {
+            "type": "move",
+            "direction": direction,
+            "description": desc,
+            "coordinates": list(dest.coordinates),
+            "exits": list(dest.exits.keys()),
+        }

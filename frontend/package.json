@@ -1,7 +1,7 @@
 {
   "name": "serverless-game-frontend",
   "version": "1.0.0",
-  "description": "static website (angular) for the serverless game",
+  "description": "React frontend for the serverless game",
   "main": "index.js",
   "directories": {
     "lib": "lib"
@@ -20,7 +20,7 @@
   },
   "homepage": "https://github.com/silarsis/serverless-game#readme",
   "dependencies": {
-    "firebase": "^10.0.0",
+    "@react-oauth/google": "^0.12.1",
     "serverless": "^4.31.2",
     "serverless-finch": "^4.0.4",
     "serverless-pseudo-parameters": "^2.5.0",
