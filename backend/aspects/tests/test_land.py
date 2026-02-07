@@ -4,7 +4,7 @@ import unittest
 from os import environ
 
 import boto3
-from moto import mock_dynamodb
+from moto import mock_aws
 
 from aspects.land import Land
 
@@ -17,8 +17,8 @@ class TestLand(unittest.TestCase):
 
     def setUp(self):
         """Set up mocked DynamoDB resources for testing."""
-        self.mocks = [mock_dynamodb()]
-        [mock.start() for mock in self.mocks]
+        self.mock = mock_aws()
+        self.mock.start()
         boto3.resource(
             "dynamodb"
         ).create_table(  # TODO: Can we extract this from yaml and generate it?
@@ -52,7 +52,7 @@ class TestLand(unittest.TestCase):
 
     def tearDown(self):
         """Tear down mocked resources after testing."""
-        [mock.stop() for mock in self.mocks]
+        self.mock.stop()
 
     def test_init(self):
         """Test initialization of Land object."""

@@ -4,7 +4,7 @@ import unittest
 from os import environ
 
 import boto3
-from moto import mock_dynamodb, mock_iam, mock_sns, mock_stepfunctions
+from moto import mock_aws
 
 from aspects import thing
 
@@ -25,8 +25,8 @@ class TestThing(unittest.TestCase):
 
     def setUp(self):
         """Set up mocked resources, tables, and state machines for testing."""
-        self.mocks = [mock_dynamodb(), mock_sns(), mock_stepfunctions(), mock_iam()]
-        [mock.start() for mock in self.mocks]
+        self.mock = mock_aws()
+        self.mock.start()
         roleName = "serverless-game-prod-StepFunctionsServiceRole-RANDOM"
         boto3.resource("dynamodb").create_table(
             TableName=environ["testing"],
@@ -84,7 +84,7 @@ Version: "2012-10-17"
 
     def tearDown(self):
         """Tear down mocked resources after testing."""
-        [mock.stop() for mock in self.mocks]
+        self.mock.stop()
 
     def test_fail_no_tablename(self):
         """Test that Thing() raises AssertionError if no table name."""

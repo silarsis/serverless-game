@@ -15,6 +15,8 @@ custom:
     thingName: 'thing-table-${self:provider.stage}'
     locationName: 'location-table-${self:provider.stage}'
     landName: 'land-table-${self:provider.stage}'
+    usersName: 'users-${self:provider.stage}'
+    apiKeysName: 'api-keys-${self:provider.stage}'
   topics:
     thingName: 'thing-topic-${self:provider.stage}'
   MessageDelayerName: 'message-delayer-${self:provider.stage}'
@@ -39,11 +41,18 @@ provider:
         - { "Fn::GetAtt": ["ThingDynamoDBTable", "Arn" ] }
         - { "Fn::GetAtt": ["LocationDynamoDBTable", "Arn" ] }
         - { "Fn::GetAtt": ["LandDynamoDBTable", "Arn" ] }
+        - { "Fn::GetAtt": ["UsersDynamoDBTable", "Arn" ] }
+        - { "Fn::GetAtt": ["ApiKeysDynamoDBTable", "Arn" ] }
     - Effect: Allow
       Action:
         - states:StartExecution
       Resource:
         - !Ref MessageDelayer
+    - Effect: Allow
+      Action:
+        - execute-api:ManageConnections
+      Resource:
+        - "arn:aws:execute-api:#{AWS::Region}:#{AWS::AccountId}:*/@connections/*"
   environment:
     THING_TABLE: ${self:custom.tables.thingName}
     LOCATION_TABLE: ${self:custom.tables.locationName}
@@ -54,6 +63,69 @@ provider:
     DD_TRACE_GLOBAL_TAGS: "lightstep.service_name:serverless-game,lightstep.access_token:${param:lightstep_access_token}"
 
 functions:
+  authLogin:
+    handler: aspects/auth.auth_login
+    environment:
+      GOOGLE_CLIENT_ID: ${param:google_client_id, ''}
+      USERS_TABLE: ${self:custom.tables.usersName}
+      API_KEYS_TABLE: ${self:custom.tables.apiKeysName}
+      JWT_SECRET: ${param:jwt_secret, 'dev-secret'}
+    events:
+      - http:
+          path: /api/auth/login
+          method: post
+          cors: true
+  authGenerateKey:
+    handler: aspects/auth.auth_generate_key
+    environment:
+      API_KEYS_TABLE: ${self:custom.tables.apiKeysName}
+      JWT_SECRET: ${param:jwt_secret, 'dev-secret'}
+    events:
+      - http:
+          path: /api/auth/keys
+          method: post
+          cors: true
+  authListKeys:
+    handler: aspects/auth.auth_list_keys
+    environment:
+      API_KEYS_TABLE: ${self:custom.tables.apiKeysName}
+      JWT_SECRET: ${param:jwt_secret, 'dev-secret'}
+    events:
+      - http:
+          path: /api/auth/keys
+          method: get
+          cors: true
+  authDeleteKey:
+    handler: aspects/auth.auth_delete_key
+    environment:
+      API_KEYS_TABLE: ${self:custom.tables.apiKeysName}
+      JWT_SECRET: ${param:jwt_secret, 'dev-secret'}
+    events:
+      - http:
+          path: /api/auth/keys/{api_key}
+          method: delete
+          cors: true
+  wsConnect:
+    handler: aspects/websocket_handlers.connect_handler
+    environment:
+      JWT_SECRET: ${param:jwt_secret, 'dev-secret'}
+    events:
+      - websocket:
+          route: $connect
+  wsDisconnect:
+    handler: aspects/websocket_handlers.disconnect_handler
+    environment:
+      THING_TABLE: ${self:custom.tables.thingName}
+    events:
+      - websocket:
+          route: $disconnect
+  wsDefault:
+    handler: aspects/websocket_handlers.command_handler
+    environment:
+      THING_TABLE: ${self:custom.tables.thingName}
+    events:
+      - websocket:
+          route: $default
   eventlogger:
     handler: aspects/eventLogger.handler
     VpcId:
@@ -119,8 +191,99 @@ functions:
             aspect:
               - LandCreator
 
+  communication:
+    handler: aspects/communication.handler
+    VpcId:
+      Ref:
+        Fn::ImportValue: VpcId
+    package:
+      exclude:
+        - ./**
+      include:
+        - aspects/**
+    events:
+      - sns:
+          arn: "arn:aws:sns:#{AWS::Region}:#{AWS::AccountId}:${self:custom.topics.thingName}"
+          filterPolicy:
+            aspect:
+              - Communication
+
+  inventory:
+    handler: aspects/inventory.handler
+    VpcId:
+      Ref:
+        Fn::ImportValue: VpcId
+    package:
+      exclude:
+        - ./**
+      include:
+        - aspects/**
+    events:
+      - sns:
+          arn: "arn:aws:sns:#{AWS::Region}:#{AWS::AccountId}:${self:custom.topics.thingName}"
+          filterPolicy:
+            aspect:
+              - Inventory
+
+  npc:
+    handler: aspects/npc.handler
+    VpcId:
+      Ref:
+        Fn::ImportValue: VpcId
+    package:
+      exclude:
+        - ./**
+      include:
+        - aspects/**
+    events:
+      - sns:
+          arn: "arn:aws:sns:#{AWS::Region}:#{AWS::AccountId}:${self:custom.topics.thingName}"
+          filterPolicy:
+            aspect:
+              - NPC
+
 resources:
   Resources:
+    UsersDynamoDBTable:
+      Type: 'AWS::DynamoDB::Table'
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: google_uid
+            AttributeType: S
+        KeySchema:
+          - AttributeName: google_uid
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        TableName: ${self:custom.tables.usersName}
+    ApiKeysDynamoDBTable:
+      Type: 'AWS::DynamoDB::Table'
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: api_key
+            AttributeType: S
+          - AttributeName: google_uid
+            AttributeType: S
+        KeySchema:
+          - AttributeName: api_key
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: "by-user"
+            KeySchema:
+              - AttributeName: google_uid
+                KeyType: HASH
+              - AttributeName: api_key
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+            ProvisionedThroughput:
+              ReadCapacityUnits: 1
+              WriteCapacityUnits: 1
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        TableName: ${self:custom.tables.apiKeysName}
     ThingTopic:
       Type: AWS::SNS::Topic
       Properties:

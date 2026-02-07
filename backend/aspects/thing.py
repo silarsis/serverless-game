@@ -9,7 +9,10 @@ from os import environ
 from typing import Any, Dict
 from uuid import uuid4
 
+from botocore.exceptions import ClientError
+
 from aspects.aws_client import (
+    get_api_gateway_client,
     get_dynamodb_table,
     get_sns_topic,
     get_stepfunctions_client,
@@ -237,6 +240,102 @@ class Thing(UserDict):
             data.update(response or {})
             Call(c["tid"], "", c["uuid"], c["aspect"], c["action"], **data).now()
         actor._save()
+
+    @property
+    def connection_id(self):
+        """Get the WebSocket connection ID if this entity is connected."""
+        return self.data.get("connection_id")
+
+    @connection_id.setter
+    def connection_id(self, value):
+        """Set or clear the WebSocket connection ID."""
+        if value:
+            self.data["connection_id"] = value
+        else:
+            self.data.pop("connection_id", None)
+        self._save()
+
+    def push_event(self, event: Dict) -> None:
+        """Push an event to the connected WebSocket, if any."""
+        if not self.connection_id:
+            return
+        try:
+            client = get_api_gateway_client()
+            client.post_to_connection(
+                ConnectionId=self.connection_id,
+                Data=json.dumps(event, cls=DecimalEncoder).encode("utf-8"),
+            )
+        except ClientError as e:
+            if e.response["Error"]["Code"] == "GoneException":
+                logging.info(f"Connection {self.connection_id} gone, clearing")
+                self.connection_id = None
+            else:
+                raise
+
+    @callable
+    def attach_connection(self, connection_id: str) -> dict:
+        """Attach a WebSocket connection to this entity."""
+        self.data["connection_id"] = connection_id
+        self._save()
+        return {"status": "connected", "entity_uuid": self.uuid}
+
+    @callable
+    def detach_connection(self) -> dict:
+        """Detach the WebSocket connection from this entity."""
+        self.data.pop("connection_id", None)
+        self._save()
+        return {"status": "disconnected", "entity_uuid": self.uuid}
+
+    @callable
+    def receive_command(self, command: str, **kwargs) -> dict:
+        """Receive and route a command from WebSocket to a @player_command method."""
+        method = getattr(self, command, None)
+        if method is None:
+            result = {"error": f"Unknown command: {command}"}
+            self.push_event(result)
+            return result
+        # Check if the method is marked as player-callable
+        if not hasattr(method, "_is_player_command") and not hasattr(method, "_is_callable"):
+            result = {"error": f"Command '{command}' is not available"}
+            self.push_event(result)
+            return result
+        result = method(**kwargs)
+        if result:
+            self.push_event(result)
+        return result
+
+    def broadcast_location_event(self, event: Dict) -> None:
+        """Broadcast an event to all connected entities at the same location as this entity.
+
+        Requires the entity to have a 'location' field in its data.
+        Skips self.
+        """
+        location_uuid = self.data.get("location")
+        if not location_uuid:
+            return
+
+        # Import here to avoid circular imports
+        from aspects.aws_client import get_dynamodb_table
+
+        table = get_dynamodb_table("LOCATION_TABLE")
+        try:
+            from boto3.dynamodb.conditions import Key
+
+            result = table.query(
+                IndexName="contents",
+                Select="ALL_PROJECTED_ATTRIBUTES",
+                KeyConditionExpression=Key("location").eq(location_uuid),
+            )
+            for item in result.get("Items", []):
+                if item["uuid"] == self.uuid:
+                    continue
+                try:
+                    entity = Thing(uuid=item["uuid"])
+                    entity.push_event(event)
+                except (KeyError, Exception):
+                    pass
+        except Exception as e:
+            logging.debug(f"Could not broadcast to location {location_uuid}: {e}")
 
     def _sendEvent(self, event: EventType) -> str:
         """Send an event to the SNS topic with current object's tid and uuid."""

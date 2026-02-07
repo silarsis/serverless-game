@@ -29,7 +29,7 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Cache pip dependencies
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-${{ hashFiles('backend/requirements-dev.txt') }}
@@ -72,7 +72,7 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Cache pip dependencies
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-${{ hashFiles('backend/requirements-dev.txt') }}
@@ -85,10 +85,10 @@ jobs:
           pip install -e . -r requirements-dev.txt
 
       - name: Run tests with pytest
-        run: pytest --cov=aspects --cov-report=xml --cov-report=term
+        run: pytest --cov=aspects --cov-report=xml --cov-report=term --cov-fail-under=30
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         with:
           files: ./backend/coverage.xml
           fail_ci_if_error: false
@@ -116,11 +116,26 @@ jobs:
       - name: Display Bandit report
         run: bandit -r backend/aspects/ -ll || true
 
+  # Gate: all checks must pass before merge
+  ci-gate:
+    name: CI Gate
+    runs-on: ubuntu-latest
+    needs: [lint, test, security]
+    if: always()
+    steps:
+      - name: Check required jobs
+        run: |
+          if [ "${{ needs.lint.result }}" != "success" ] || [ "${{ needs.test.result }}" != "success" ]; then
+            echo "Required checks failed: lint=${{ needs.lint.result }}, test=${{ needs.test.result }}"
+            exit 1
+          fi
+          echo "All required checks passed"
+
   # Placeholder for deployment job - requires AWS credentials
   deploy:
     name: Deploy (Placeholder)
     runs-on: ubuntu-latest
-    needs: [lint, test]
+    needs: [ci-gate]
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     environment: production
 

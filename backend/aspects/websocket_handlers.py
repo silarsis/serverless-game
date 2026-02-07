@@ -5,6 +5,7 @@ import logging
 from typing import Dict, Optional
 from uuid import uuid4
 
+from aspects.auth import verify_jwt
 from aspects.aws_client import get_dynamodb_table
 from aspects.thing import Call
 
@@ -12,11 +13,26 @@ from aspects.thing import Call
 def connect_handler(event: dict, context: dict) -> dict:
     """Handle WebSocket $connect.
 
-    Just accepts the connection—entity binding happens separately via 'possess' command.
+    Verifies JWT from query string before accepting the connection.
+    Entity binding happens separately via 'possess' command.
     """
     connection_id = event["requestContext"]["connectionId"]
-    logging.info(f"WebSocket connected: {connection_id}")
-    return {"statusCode": 200}
+
+    # Extract JWT from query string (?token=xxx)
+    query_params = event.get("queryStringParameters") or {}
+    token = query_params.get("token")
+
+    if not token:
+        logging.warning(f"WebSocket connect rejected: no token from {connection_id}")
+        return {"statusCode": 401, "body": "Missing token"}
+
+    try:
+        claims = verify_jwt(token)
+        logging.info(f"WebSocket connected: {connection_id} user={claims.get('sub')}")
+        return {"statusCode": 200}
+    except ValueError as e:
+        logging.warning(f"WebSocket connect rejected: {e}")
+        return {"statusCode": 401, "body": "Invalid token"}
 
 
 def disconnect_handler(event: dict, context: dict) -> dict:
