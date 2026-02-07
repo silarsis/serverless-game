@@ -12,14 +12,24 @@ function App() {
   const token = getToken();
   const [showGuide, setShowGuide] = useState(false);
 
-  return (
-    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-      <div>
-        {token ? <Game onShowGuide={() => setShowGuide(true)} /> : <SignIn onShowGuide={() => setShowGuide(true)} />}
-        {showGuide && <GameGuide onClose={() => setShowGuide(false)} />}
-      </div>
-    </GoogleOAuthProvider>
+  const content = (
+    <div>
+      {token ? (
+        <Game onShowGuide={() => setShowGuide(true)} />
+      ) : (
+        <SignIn onShowGuide={() => setShowGuide(true)} googleEnabled={!!GOOGLE_CLIENT_ID} />
+      )}
+      {showGuide && <GameGuide onClose={() => setShowGuide(false)} />}
+    </div>
   );
+
+  // Only wrap in GoogleOAuthProvider when a client ID is configured.
+  // Without a valid client ID the Google SDK throws on initialization.
+  if (GOOGLE_CLIENT_ID) {
+    return <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>{content}</GoogleOAuthProvider>;
+  }
+
+  return content;
 }
 
 export default App;

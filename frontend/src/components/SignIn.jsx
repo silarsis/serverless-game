@@ -3,39 +3,49 @@ import { useGoogleLogin } from "@react-oauth/google";
 
 const API_URL = import.meta.env.VITE_API_URL || "";
 
-const SignIn = ({ onShowGuide }) => {
+// Separate component that uses the Google hook — only rendered when
+// GoogleOAuthProvider is mounted (i.e. a client ID is configured).
+const GoogleLoginButton = ({ loading, onSuccess, onError }) => {
+  const googleLogin = useGoogleLogin({
+    onSuccess,
+    onError: () => onError("Google sign-in failed"),
+    flow: "implicit",
+  });
+
+  return (
+    <button onClick={() => googleLogin()} disabled={loading} style={styles.googleButton}>
+      {loading ? "Signing in..." : "Sign in with Google"}
+    </button>
+  );
+};
+
+const SignIn = ({ onShowGuide, googleEnabled = false }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const googleLogin = useGoogleLogin({
-    onSuccess: async (tokenResponse) => {
-      setLoading(true);
-      setError("");
-      try {
-        const resp = await fetch(`${API_URL}/api/auth/login`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ token: tokenResponse.credential }),
-        });
-        if (!resp.ok) throw new Error("Server error. Failed to login.");
-        const data = await resp.json();
-        if (!data.jwt) throw new Error("Missing JWT from server");
-        window.localStorage.setItem("jwt", data.jwt);
-        if (data.entity) {
-          window.localStorage.setItem("entity", JSON.stringify(data.entity));
-        }
-        window.location.href = "/";
-      } catch (e) {
-        setError(e.message || "Sign in failed");
-      } finally {
-        setLoading(false);
+  const handleGoogleSuccess = async (tokenResponse) => {
+    setLoading(true);
+    setError("");
+    try {
+      const resp = await fetch(`${API_URL}/api/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: tokenResponse.credential }),
+      });
+      if (!resp.ok) throw new Error("Server error. Failed to login.");
+      const data = await resp.json();
+      if (!data.jwt) throw new Error("Missing JWT from server");
+      window.localStorage.setItem("jwt", data.jwt);
+      if (data.entity) {
+        window.localStorage.setItem("entity", JSON.stringify(data.entity));
       }
-    },
-    onError: () => {
-      setError("Google sign-in failed");
-    },
-    flow: "implicit",
-  });
+      window.location.href = "/";
+    } catch (e) {
+      setError(e.message || "Sign in failed");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const devLogin = async () => {
     setLoading(true);
@@ -69,9 +79,9 @@ const SignIn = ({ onShowGuide }) => {
           A collaborative world where humans and AI agents explore together.
         </p>
         <div style={styles.buttons}>
-          <button onClick={() => googleLogin()} disabled={loading} style={styles.googleButton}>
-            {loading ? "Signing in..." : "Sign in with Google"}
-          </button>
+          {googleEnabled && (
+            <GoogleLoginButton loading={loading} onSuccess={handleGoogleSuccess} onError={setError} />
+          )}
           <button onClick={devLogin} disabled={loading} style={styles.devButton}>
             Dev Mode (Local)
           </button>
