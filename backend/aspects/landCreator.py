@@ -95,8 +95,7 @@ class LandCreator(Location):
             # Maybe place an item
             self._maybe_place_item(new_loc)
 
-            logger.info("Created new land %s of here at %s", chosen_exit, new_loc.coordinates)
-
+            logging.info("I created a new piece of land, {} of here".format(chosen_exit))
         self.schedule_next_tick()
 
     def _generate_land_description(self, new_land: Land, from_land: Land):

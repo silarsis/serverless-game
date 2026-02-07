@@ -178,7 +178,7 @@ class Thing(UserDict):
 
     def aspect(self, aspect: str) -> "Thing":
         """Return an aspect handler for this object by aspect name."""
-        return getattr(importlib.import_module(aspect.lower()), aspect)(self.uuid, self.tid)
+        return getattr(importlib.import_module(aspect.lower()), aspect)(self.uuid, self.tid)  # type: ignore
 
     @property
     def aspectName(self) -> str:
@@ -187,7 +187,7 @@ class Thing(UserDict):
 
     def _load(self, uuid: IdType) -> None:
         """Load object state from DynamoDB by UUID."""
-        self.data: Dict = self._table.get_item(Key={"uuid": uuid}).get("Item", {})
+        self.data: Dict = self._table.get_item(Key={"uuid": uuid}).get("Item", {})  # type: ignore
         if not self.data:
             raise KeyError(f"load for non-existent item {uuid}")
 
@@ -350,11 +350,11 @@ class Thing(UserDict):
 
     def call(self, uuid: IdType, aspect: str, action: str, **kwargs):
         """Build a Call object to target another aspect/action."""
-        return Call(self.tid, self.uuid, uuid, aspect, action, **kwargs)
+        return Call(self.tid, self.uuid, uuid, aspect, action, **kwargs)  # type: ignore
 
     def callAspect(self, aspect: str, action: str, **kwargs):
         """Call an aspect on this object."""
-        return self.call(self.uuid, aspect, action, **kwargs)
+        return self.call(self.uuid, aspect, action, **kwargs)  # type: ignore
 
     def createAspect(self, aspect: str) -> None:
         """Create a new aspect for this object's uuid."""
