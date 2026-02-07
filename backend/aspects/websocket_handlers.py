@@ -29,9 +29,7 @@ def connect_handler(event: dict, context: dict) -> dict:
 
     try:
         claims = verify_jwt(token)
-        logging.info(
-            f"WebSocket connected: {connection_id} user={claims.get('sub')}"
-        )
+        logging.info(f"WebSocket connected: {connection_id} user={claims.get('sub')}")
         return {"statusCode": 200}
     except ValueError as e:
         logging.warning(f"WebSocket connect rejected: {e}")

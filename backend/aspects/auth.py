@@ -173,9 +173,7 @@ def login(token: str = None, api_key: str = None) -> dict:
     try:
         if api_key:
             key_info = _verify_api_key(api_key)
-            internal_jwt = _generate_jwt(
-                key_info["google_uid"], bot_name=key_info["bot_name"]
-            )
+            internal_jwt = _generate_jwt(key_info["google_uid"], bot_name=key_info["bot_name"])
             return {
                 "success": True,
                 "jwt": internal_jwt,

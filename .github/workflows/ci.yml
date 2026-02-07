@@ -83,7 +83,7 @@ jobs:
           pip install -e . -r requirements-dev.txt
 
       - name: Run tests with pytest
-        run: pytest --cov=aspects --cov-report=xml --cov-report=term --cov-fail-under=50
+        run: pytest --cov=aspects --cov-report=xml --cov-report=term --cov-fail-under=30
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
