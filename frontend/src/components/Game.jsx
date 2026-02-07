@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 
-const WS_URL = import.meta.env.VITE_WS_URL || "ws://localhost:8000/ws";
+const WS_URL = import.meta.env.VITE_WS_URL || "ws://127.0.0.1:8000/ws";
 
 const Game = ({ onShowGuide }) => {
   const [events, setEvents] = useState([]);
