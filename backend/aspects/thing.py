@@ -325,7 +325,9 @@ class Thing(UserDict):
                 if hasattr(attr, "_is_player_command") and attr._is_player_command:
                     if attr_name not in commands:
                         doc = getattr(attr, "__doc__", "") or ""
-                        first_line = doc.strip().split("\n")[0] if doc.strip() else "No description."
+                        first_line = (
+                            doc.strip().split("\n")[0] if doc.strip() else "No description."
+                        )
                         commands[attr_name] = {
                             "name": attr_name,
                             "summary": first_line,
