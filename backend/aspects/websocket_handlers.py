@@ -3,7 +3,6 @@
 import json
 import logging
 from typing import Dict, Optional
-from urllib.parse import parse_qs
 from uuid import uuid4
 
 from aspects.auth import verify_jwt
