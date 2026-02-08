@@ -60,7 +60,7 @@ class TestInventory(unittest.TestCase):
         )
 
     def _make_player(self, name="TestPlayer", location="room-1", carry_capacity=None):
-        """Helper: create Entity + Inventory aspect for a player."""
+        """Create Entity + Inventory aspect for a player."""
         from aspects.inventory import Inventory
         from aspects.thing import Entity
 
@@ -80,9 +80,16 @@ class TestInventory(unittest.TestCase):
         inv.entity = entity
         return inv, entity
 
-    def _make_item(self, name="a test item", location="room-1", is_item=True,
-                   weight=1, description="", is_terrain=False):
-        """Helper: create Entity + Inventory aspect for an item."""
+    def _make_item(
+        self,
+        name="a test item",
+        location="room-1",
+        is_item=True,
+        weight=1,
+        description="",
+        is_terrain=False,
+    ):
+        """Create Entity + Inventory aspect for an item."""
         from aspects.inventory import Inventory
         from aspects.thing import Entity
 
@@ -158,8 +165,7 @@ class TestInventory(unittest.TestCase):
         """Test the full take and drop flow."""
         inv, player_entity = self._make_player(name="TestPlayer", location="room-1")
         _, item_entity = self._make_item(
-            name="a golden ring", location="room-1",
-            description="A ring of gold.", is_item=True
+            name="a golden ring", location="room-1", description="A ring of gold.", is_item=True
         )
 
         # Take the item
@@ -169,6 +175,7 @@ class TestInventory(unittest.TestCase):
 
         # Verify item is now in player's inventory (location = player uuid)
         from aspects.thing import Entity
+
         item_reloaded = Entity(uuid=item_entity.uuid)
         assert item_reloaded.location == player_entity.uuid
 
@@ -184,8 +191,10 @@ class TestInventory(unittest.TestCase):
         """Test examining an item in inventory."""
         inv, player_entity = self._make_player(location="room-1")
         _, item_entity = self._make_item(
-            name="magic wand", location=player_entity.uuid,
-            description="A wand crackling with energy.", is_item=True
+            name="magic wand",
+            location=player_entity.uuid,
+            description="A wand crackling with energy.",
+            is_item=True,
         )
 
         result = inv.examine(item_uuid=item_entity.uuid)
@@ -195,12 +204,9 @@ class TestInventory(unittest.TestCase):
 
     def test_take_weight_limit(self):
         """Test that take rejects items exceeding carry capacity."""
-        inv, _ = self._make_player(
-            name="WeakPlayer", location="room-1", carry_capacity=5
-        )
+        inv, _ = self._make_player(name="WeakPlayer", location="room-1", carry_capacity=5)
         _, heavy_entity = self._make_item(
-            name="a massive boulder", location="room-1",
-            is_item=True, weight=100
+            name="a massive boulder", location="room-1", is_item=True, weight=100
         )
 
         result = inv.take(item_uuid=heavy_entity.uuid)
@@ -209,12 +215,9 @@ class TestInventory(unittest.TestCase):
 
     def test_take_within_weight_limit(self):
         """Test that take succeeds when within carry capacity."""
-        inv, _ = self._make_player(
-            name="StrongPlayer", location="room-1", carry_capacity=50
-        )
+        inv, _ = self._make_player(name="StrongPlayer", location="room-1", carry_capacity=50)
         _, light_entity = self._make_item(
-            name="a feather", location="room-1",
-            is_item=True, weight=1
+            name="a feather", location="room-1", is_item=True, weight=1
         )
 
         result = inv.take(item_uuid=light_entity.uuid)
@@ -225,14 +228,8 @@ class TestInventory(unittest.TestCase):
         inv, player_entity = self._make_player(name="TestPlayer", location="room-1")
 
         # Create two items in player's inventory (location = player UUID)
-        self._make_item(
-            name="sword", location=player_entity.uuid,
-            is_item=True, weight=10
-        )
-        self._make_item(
-            name="shield", location=player_entity.uuid,
-            is_item=True, weight=15
-        )
+        self._make_item(name="sword", location=player_entity.uuid, is_item=True, weight=10)
+        self._make_item(name="shield", location=player_entity.uuid, is_item=True, weight=15)
 
         total = inv._carried_weight()
         assert total == 25
@@ -241,8 +238,7 @@ class TestInventory(unittest.TestCase):
         """Test that default carry capacity is 50."""
         inv, _ = self._make_player(name="TestPlayer", location="room-1")
         _, item_entity = self._make_item(
-            name="a heavy sack", location="room-1",
-            is_item=True, weight=49
+            name="a heavy sack", location="room-1", is_item=True, weight=49
         )
 
         result = inv.take(item_uuid=item_entity.uuid)
@@ -252,8 +248,7 @@ class TestInventory(unittest.TestCase):
         """Test that terrain entities (is_terrain=True) can't be picked up."""
         inv, _ = self._make_player(name="TestPlayer", location="room-1")
         _, terrain_entity = self._make_item(
-            name="a tall oak tree", location="room-1",
-            is_terrain=True, weight=999
+            name="a tall oak tree", location="room-1", is_terrain=True, weight=999
         )
 
         result = inv.take(item_uuid=terrain_entity.uuid)

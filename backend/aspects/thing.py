@@ -596,9 +596,7 @@ class Entity(UserDict):
     def schedule_next_tick(self) -> None:
         """Schedule the entity's next tick after tickDelay seconds."""
         primary = self.data.get("primary_aspect", "Entity")
-        Call(str(uuid4()), self.uuid, self.uuid, primary, "tick").after(
-            seconds=self.tickDelay
-        )
+        Call(str(uuid4()), self.uuid, self.uuid, primary, "tick").after(seconds=self.tickDelay)
 
     # --- Call Helpers ---
 

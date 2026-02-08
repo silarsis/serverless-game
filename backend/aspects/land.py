@@ -201,7 +201,6 @@ class Land(Location):
             return  # already generated
 
         from .worldgen import generate_room
-        from .worldgen.base import GenerationContext
 
         # Build context: where did we come from, what neighbors exist?
         context = self._build_generation_context(room)
@@ -266,9 +265,7 @@ class Land(Location):
         neighbors = {}
         for direction in ["north", "south", "east", "west", "up", "down"]:
             try:
-                neighbor_coords = Land._new_coords_by_direction(
-                    room.coordinates, direction
-                )
+                neighbor_coords = Land._new_coords_by_direction(room.coordinates, direction)
                 # Check if a room already exists at those coords
                 coords_str = Land._convertCoordinatesForStorage(neighbor_coords)
                 table = get_dynamodb_table(self._tableName)
@@ -284,8 +281,7 @@ class Land(Location):
                     neighbor = Land(uuid=neighbor_uuid)
                     reverse = self._OPPOSITE.get(direction)
                     has_exit_to_us = (
-                        reverse in neighbor.exits
-                        and neighbor.exits[reverse] == room.uuid
+                        reverse in neighbor.exits and neighbor.exits[reverse] == room.uuid
                     )
                     neighbors[direction] = {
                         "coords": neighbor_coords,

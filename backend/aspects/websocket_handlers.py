@@ -7,7 +7,7 @@ from uuid import uuid4
 
 from aspects.auth import verify_jwt
 from aspects.aws_client import get_dynamodb_table
-from aspects.thing import Call, Entity
+from aspects.thing import Call
 
 
 def connect_handler(event: dict, context: dict) -> dict:

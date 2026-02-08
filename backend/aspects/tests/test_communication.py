@@ -60,7 +60,7 @@ class TestCommunication(unittest.TestCase):
         )
 
     def _make_comm_with_entity(self, name="TestPlayer", location="loc-123"):
-        """Helper: create an Entity + Communication aspect wired together."""
+        """Create an Entity + Communication aspect wired together."""
         from aspects.communication import Communication
         from aspects.thing import Entity
 

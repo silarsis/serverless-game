@@ -141,9 +141,7 @@ class TestHelp:
 
     def test_help_multi_aspect_entity(self, dynamodb):
         """Help on a player entity with multiple aspects should include all commands."""
-        entity = _make_entity_with_aspects(
-            ["Land", "Inventory", "Communication"], primary="Land"
-        )
+        entity = _make_entity_with_aspects(["Land", "Inventory", "Communication"], primary="Land")
 
         result = entity.help()
         assert result["type"] == "help"

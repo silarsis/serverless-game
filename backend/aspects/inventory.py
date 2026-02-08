@@ -12,7 +12,7 @@ import logging
 
 from .decorators import player_command
 from .handler import lambdaHandler
-from .thing import Aspect, Entity, IdType, callable
+from .thing import Aspect, Entity, callable
 
 logger = logging.getLogger(__name__)
 
@@ -157,7 +157,10 @@ class Inventory(Aspect):
             return {"type": "error", "message": "That item doesn't exist."}
 
         # Must be in our inventory or at our location
-        if item_entity.location != self.entity.uuid and item_entity.location != self.entity.location:
+        if (
+            item_entity.location != self.entity.uuid
+            and item_entity.location != self.entity.location
+        ):
             return {"type": "error", "message": "You can't see that item."}
 
         # Load item's inventory aspect for properties
