@@ -65,7 +65,7 @@ class TestBiomeClassification(unittest.TestCase):
         self.assertEqual(b1.moisture, b2.moisture)
 
     def test_biome_data_fields(self):
-        """BiomeData should have all expected fields."""
+        """Verify biome data has all expected fields."""
         from aspects.worldgen.biome import get_biome
 
         b = get_biome(0, 0, 0)
@@ -338,7 +338,7 @@ class TestLandmarks(unittest.TestCase):
 
     def test_landmark_fields(self):
         """Landmarks should have all required fields."""
-        from aspects.worldgen.landmarks import Landmark, _landmark_at
+        from aspects.worldgen.landmarks import _landmark_at
 
         # Find a landmark by brute force (check many coords)
         landmark = None
@@ -597,7 +597,7 @@ class TestGeneratorRegistry(unittest.TestCase):
     def test_register_custom_generator(self):
         """Should be able to register a custom generator."""
         from aspects.worldgen import _GENERATORS, register_generator
-        from aspects.worldgen.base import GenerationContext, RoomBlueprint
+        from aspects.worldgen.base import RoomBlueprint
 
         class MockGenerator:
             def generate(self, coords, context):

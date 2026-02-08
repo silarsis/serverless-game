@@ -8,7 +8,7 @@ extension point for cave systems, dungeons, mines, etc.
 from __future__ import annotations
 
 import hashlib
-from typing import Any, Dict, List, Tuple
+from typing import Dict, Tuple
 
 from .base import GenerationContext, RoomBlueprint
 
@@ -91,6 +91,7 @@ class DungeonGenerator:
         coords: Tuple[int, int, int],
         context: GenerationContext,
     ) -> RoomBlueprint:
+        """Generate a dungeon room at the given coordinates."""
         seed = _coord_seed(*coords)
         biome = context.biome_data.biome_name if context.biome_data else "shallow_cave"
 

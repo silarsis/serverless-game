@@ -257,5 +257,5 @@ def get_biome(x: int, y: int, z: int) -> BiomeData:
 
 
 def get_biome_at(coords: Tuple[int, int, int]) -> BiomeData:
-    """Convenience wrapper for get_biome with a tuple."""
+    """Return biome data for coordinate tuple."""
     return get_biome(*coords)

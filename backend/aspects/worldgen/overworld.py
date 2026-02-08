@@ -10,7 +10,7 @@ from __future__ import annotations
 import hashlib
 from typing import Any, Dict, List, Tuple
 
-from .base import BiomeData, GenerationContext, RoomBlueprint
+from .base import GenerationContext, RoomBlueprint
 from .biome import get_biome
 
 # ---------------------------------------------------------------------------
@@ -494,7 +494,7 @@ class OverworldGenerator:
         lookup_biome = base_biome
         for prefix in ("eldritch_", "ancient_"):
             if lookup_biome.startswith(prefix):
-                lookup_biome = lookup_biome[len(prefix) :]
+                lookup_biome = lookup_biome[len(prefix) :]  # noqa: E203
                 break
 
         seed = _coord_seed(*coords)
@@ -638,7 +638,7 @@ class OverworldGenerator:
                 far_name = far_biome.biome_name
                 for prefix in ("eldritch_", "ancient_"):
                     if far_name.startswith(prefix):
-                        far_name = far_name[len(prefix) :]
+                        far_name = far_name[len(prefix) :]  # noqa: E203
                         break
 
                 # Only report if different from current biome

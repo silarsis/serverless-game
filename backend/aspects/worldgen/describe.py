@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import hashlib
 import logging
-from typing import List
 
 from .base import GenerationContext, RoomBlueprint
 
@@ -155,7 +154,7 @@ def _generate_fallback(blueprint: RoomBlueprint) -> str:
     biome = blueprint.biome
     for prefix in ("eldritch_", "ancient_"):
         if biome.startswith(prefix):
-            biome = biome[len(prefix) :]
+            biome = biome[len(prefix) :]  # noqa: E203
             break
 
     templates = _TEMPLATES.get(biome, _DEFAULT_TEMPLATES)

@@ -11,7 +11,7 @@ Usage from Land:
 from __future__ import annotations
 
 import logging
-from typing import Dict, Optional, Tuple
+from typing import Dict, Tuple
 
 from .base import GenerationContext, RoomBlueprint
 from .biome import get_biome
