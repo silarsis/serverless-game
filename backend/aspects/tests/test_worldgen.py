@@ -187,8 +187,7 @@ class TestOverworldGenerator(unittest.TestCase):
         )
         blueprint = gen.generate((5, 6, 0), context)
 
-        self.assertIn("south", blueprint.exits,
-                       "Exit back to came_from must be included")
+        self.assertIn("south", blueprint.exits, "Exit back to came_from must be included")
 
     def test_forced_reciprocal_exits(self):
         """If a neighbor has an exit pointing to us, we must include reciprocal."""
@@ -210,8 +209,7 @@ class TestOverworldGenerator(unittest.TestCase):
             },
         )
         blueprint = gen.generate((5, 5, 0), context)
-        self.assertIn("east", blueprint.exits,
-                       "Reciprocal exit for neighbor must be included")
+        self.assertIn("east", blueprint.exits, "Reciprocal exit for neighbor must be included")
 
     def test_exit_count_varies_by_biome(self):
         """Different biomes should produce different typical exit counts."""
@@ -373,8 +371,7 @@ class TestLandmarks(unittest.TestCase):
         expected = total / LANDMARK_RARITY
         # Allow wide margin for randomness
         self.assertGreater(count, 0, "Should find at least one landmark")
-        self.assertLess(count, expected * 5,
-                        f"Too many landmarks: {count}, expected ~{expected}")
+        self.assertLess(count, expected * 5, f"Too many landmarks: {count}, expected ~{expected}")
 
     def test_nearby_landmark_discovery(self):
         """check_landmark should find nearby landmark centers."""
@@ -582,8 +579,9 @@ class TestFullPipeline(unittest.TestCase):
         blueprint = generate_room(center, context)
 
         # Blueprint at landmark center should have landmark data
-        self.assertIsNotNone(blueprint.landmark,
-                             "Blueprint at landmark center should have landmark")
+        self.assertIsNotNone(
+            blueprint.landmark, "Blueprint at landmark center should have landmark"
+        )
 
 
 class TestGeneratorRegistry(unittest.TestCase):
