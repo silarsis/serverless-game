@@ -41,6 +41,7 @@ services:
       - AWS_ACCESS_KEY_ID=test
       - AWS_SECRET_ACCESS_KEY=test
       - AWS_DEFAULT_REGION=ap-southeast-1
+      - ENTITY_TABLE=entity-table-local
       - THING_TABLE=thing-table-local
       - LOCATION_TABLE=location-table-local
       - LAND_TABLE=land-table-local

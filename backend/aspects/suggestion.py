@@ -2,6 +2,9 @@
 
 Allows players and agents to suggest new features, list existing suggestions,
 and vote on ideas. The most popular suggestions guide world development.
+
+Shared fields (name) live on Entity, not on this aspect.
+Access them via self.entity.*.
 """
 
 import logging
@@ -9,15 +12,20 @@ import time
 
 from .decorators import admin_only, player_command
 from .handler import lambdaHandler
-from .location import Location
+from .thing import Aspect, Entity
 
 logger = logging.getLogger(__name__)
 
 
-class Suggestion(Location):
-    """Aspect handling feature suggestions and voting."""
+class Suggestion(Aspect):
+    """Aspect handling feature suggestions and voting.
 
-    _tableName = "LOCATION_TABLE"  # Suggestions are entities in the Location table
+    Uses its own dedicated SUGGESTION_TABLE — suggestion records are not
+    entity aspect records (they are standalone documents with their own UUIDs).
+    The Suggestion aspect itself has no persistent per-entity data.
+    """
+
+    _tableName = "LOCATION_TABLE"  # Aspect record table (minimal)
 
     @player_command
     def suggest(self, text: str) -> dict:
@@ -32,9 +40,9 @@ class Suggestion(Location):
         if not text or not text.strip():
             return {"type": "error", "message": "Suggest what? Please describe your idea."}
 
-        author_name = self.data.get("name", self.uuid[:8])
+        author_name = self.entity.name if self.entity else self.uuid[:8]
 
-        # Create the suggestion as a new entity in the suggestion table
+        # Create the suggestion as a new record in the suggestion table
         from uuid import uuid4
 
         from .aws_client import get_dynamodb_table
@@ -46,7 +54,7 @@ class Suggestion(Location):
                 "uuid": suggestion_id,
                 "text": text.strip(),
                 "author": author_name,
-                "author_uuid": self.uuid,
+                "author_uuid": self.entity.uuid if self.entity else self.uuid,
                 "status": "pending",
                 "votes": 0,
                 "voters": [],
@@ -129,12 +137,13 @@ class Suggestion(Location):
         if not item:
             return {"type": "error", "message": "Suggestion not found."}
 
+        voter_uuid = self.entity.uuid if self.entity else self.uuid
         voters = item.get("voters", [])
-        if self.uuid in voters:
+        if voter_uuid in voters:
             return {"type": "error", "message": "You have already voted for this suggestion."}
 
         # Add vote
-        voters.append(self.uuid)
+        voters.append(voter_uuid)
         new_votes = int(item.get("votes", 0)) + 1
 
         table.update_item(
@@ -185,4 +194,4 @@ class Suggestion(Location):
         }
 
 
-handler = lambdaHandler(Suggestion)
+handler = lambdaHandler(Entity)

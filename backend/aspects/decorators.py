@@ -45,12 +45,15 @@ def player_command(func: Callable) -> Callable:
     def wrapper(self, *args, **kwargs):
         # Check if this is a system entity (admin-only, no player access)
         if getattr(self, "is_system", False):
-            logger.warning(f"Player attempted to command system entity {self.uuid}")
+            entity = getattr(self, "entity", self)
+            logger.warning(f"Player attempted to command system entity {entity.uuid}")
             return {"error": "System entities cannot be player-controlled"}
 
         # Validate the connection ownership (set by receive_command)
+        # In the entity table architecture, connection_id lives on entity, not aspect
         caller_connection = kwargs.pop("_caller_connection_id", None)
-        expected_connection = getattr(self, "connection_id", None)
+        entity = getattr(self, "entity", self)
+        expected_connection = getattr(entity, "connection_id", None)
 
         if caller_connection and expected_connection:
             if caller_connection != expected_connection:

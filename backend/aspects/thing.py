@@ -1,4 +1,25 @@
-"""Core thing and event/callback logic for serverless-game backend."""
+"""Core entity and aspect system for serverless-game backend.
+
+Design Principles:
+
+    Explicit is better than implicit.
+        Cross-aspect data access uses self.entity.aspect("Inventory").data["carry_capacity"],
+        never self.data["carry_capacity"] from a different aspect. This makes dependencies
+        between aspects visible in code.
+
+    Lazy creation.
+        Entity creation writes only the entity table record. Aspect records are created on
+        first access — no multi-table write transactions needed for entity creation.
+
+    Each aspect owns its data.
+        An aspect's table stores only the data that aspect needs. The entity table stores
+        universally shared fields: uuid, name, location, connection_id, aspects.
+
+All game objects are entities — rows in a central entity table holding identity (uuid, name),
+spatial data (location), connectivity (connection_id), and a list of aspects. An entity is not
+a Land or an Inventory — it is an entity that *has* aspects. A player entity has Land, Inventory,
+Communication, and Suggestion aspects. A room has a Land aspect. An item has an Inventory aspect.
+"""
 
 import decimal
 import importlib
@@ -6,9 +27,10 @@ import json
 import logging
 from collections import UserDict
 from os import environ
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
+from boto3.dynamodb.conditions import Key
 from botocore.exceptions import ClientError
 
 from aspects.aws_client import (
@@ -104,156 +126,357 @@ class Call(UserDict):
         )
 
 
-class Thing(UserDict):
-    """Base class for game objects. Objects have state (stored in DynamoDB) and handle event/callback logic."""
+# --- Aspect Registry ---
 
-    _tableName: str = ""  # Set this in the subclass
+_ASPECT_CLASS_CACHE: Dict[str, type] = {}
 
-    @classmethod
-    def _get_allowed_actions(cls) -> frozenset:
-        """Get set of allowed action names for this class. Only @callable methods allowed."""
-        # Start with parent class allowed actions if any
-        allowed: set = set()
-        for base in cls.__bases__:
-            if hasattr(base, "_get_allowed_actions"):
-                allowed.update(base._get_allowed_actions())
 
-        # Add methods decorated with @callable from this class
-        for attr_name in dir(cls):
-            if not attr_name.startswith("_"):
-                attr = getattr(cls, attr_name)
-                if callable(attr) and hasattr(attr, "_is_callable"):
-                    allowed.add(attr_name)
+def get_aspect_class(aspect_name: str) -> type:
+    """Get an aspect class by name, with caching.
 
-        return frozenset(allowed)
+    Uses importlib to lazily import aspect modules, avoiding circular imports.
+    """
+    if aspect_name in _ASPECT_CLASS_CACHE:
+        return _ASPECT_CLASS_CACHE[aspect_name]
+    try:
+        module = importlib.import_module(f"aspects.{aspect_name.lower()}")
+        cls = getattr(module, aspect_name)
+        _ASPECT_CLASS_CACHE[aspect_name] = cls
+        return cls
+    except (ImportError, AttributeError) as e:
+        raise ValueError(f"Unknown aspect: {aspect_name}") from e
 
-    def __init__(self, uuid: IdType = None, tid: str = None):
-        """Initialize a Thing with a UUID and transaction ID, loading or creating state."""
+
+# --- Aspect Base Class ---
+
+
+class Aspect(UserDict):
+    """Base class for aspect data. Each aspect has its own DynamoDB table.
+
+    Aspects store only aspect-specific data. Shared entity fields (name, location,
+    connection_id) live on the Entity and are accessed via self.entity.
+
+    Attributes:
+        _tableName: Environment variable name for the DynamoDB table.
+        entity: Back-reference to the owning Entity instance.
+    """
+
+    _tableName: str = ""  # Set by subclass
+
+    def __init__(self, uuid: IdType = None):
+        """Initialize an Aspect, optionally loading from its table."""
         super().__init__()
-        assert self._tableName
-        self._tid: str = tid or str(uuid4())
-        self.data["uuid"] = uuid or str(uuid4())
+        self.entity: Optional["Entity"] = None
         if uuid:
             self._load(uuid)
         else:
-            self.create()
-        assert self.data
-        assert self.uuid
-
-    @property
-    def tickDelay(self):
-        """Get or initialize the tick delay for the object."""
-        if "tick_delay" not in self.data:
-            self.data["tick_delay"] = 30
-            self._save()
-        return self.data["tick_delay"]
+            self.data["uuid"] = str(uuid4())
 
     @property
     def _table(self):
-        """Return the DynamoDB table for the object's state."""
+        """Return the DynamoDB table for this aspect's data."""
         return get_dynamodb_table(self._tableName)
-
-    @callable
-    def create(self) -> None:
-        """Create object in the backing store (DynamoDB)."""
-        self._save()
-
-    @callable
-    def destroy(self) -> None:
-        """Delete this object by UUID."""
-        self._table.delete_item(Key={"uuid": self.uuid})
-        logging.info("{} has been destroyed".format(self.uuid))
-
-    @callable
-    def tick(self) -> None:
-        """Schedule this object's next tick."""
-        self.schedule_next_tick()
-
-    @callable
-    def schedule_next_tick(self) -> None:
-        """Schedule the object's next tick after tickDelay seconds."""
-        Call(str(uuid4()), self.uuid, self.uuid, self.aspectName, "tick").after(
-            seconds=self.tickDelay
-        )
-
-    def aspect(self, aspect: str) -> "Thing":
-        """Return an aspect handler for this object by aspect name."""
-        return getattr(importlib.import_module(aspect.lower()), aspect)(self.uuid, self.tid)  # type: ignore
-
-    @property
-    def aspectName(self) -> str:
-        """Return the object's aspect (class name)."""
-        return self.__class__.__name__
-
-    def _load(self, uuid: IdType) -> None:
-        """Load object state from DynamoDB by UUID."""
-        self.data: Dict = self._table.get_item(Key={"uuid": uuid}).get("Item", {})  # type: ignore
-        if not self.data:
-            raise KeyError(f"load for non-existent item {uuid}")
-
-    def _save(self) -> None:
-        """Save object state to DynamoDB."""
-        self._table.put_item(Item=self.data)
-
-    @property
-    def tid(self) -> str:
-        """Return the transaction/request ID for this object."""
-        return self._tid
 
     @property
     def uuid(self) -> IdType:
-        """Return the UUID of this object as a string."""
-        return str(self.data["uuid"])
+        """Return the UUID of this aspect's entity."""
+        return str(self.data.get("uuid", ""))
 
-    _allowed_actions: frozenset = frozenset()
-    """Allowed actions for use with the event system."""
+    def _load(self, uuid: IdType) -> None:
+        """Load aspect data from its DynamoDB table."""
+        result = self._table.get_item(Key={"uuid": uuid})
+        self.data = result.get("Item", {})
+        if not self.data:
+            raise KeyError(f"Aspect record {uuid} not found in {self._tableName}")
 
-    @classmethod
-    def _action(cls, event: EventType):
-        """Process an incoming action/event on this object, enforcing security."""
-        action = event.get("action", "")
+    def _save(self) -> None:
+        """Save aspect data to its DynamoDB table."""
+        self._table.put_item(Item=self.data)
 
-        # Security: Validate action is not private and is in allowed actions
-        if action.startswith("_"):
-            raise ValueError(f"Action '{action}' is not allowed (private methods are prohibited)")
 
-        # Get allowed actions for this class (combine parent and current class allowed actions)
-        allowed = cls._get_allowed_actions()
-        if action not in allowed:
-            raise ValueError(f"Action '{action}' is not in allowed actions: {allowed}")
+# --- Entity Class ---
 
-        uuid = event.get("uuid")  # Allowing for no uuid for creation
-        if not uuid:
-            if action != "create":
-                raise ValueError("UUID is required for non-create actions")
-        tid = str(event.get("tid") or uuid4())
-        actor = cls(uuid, tid)
 
-        method = getattr(actor, action, None)
-        if method is None or not callable(method):
-            raise ValueError(f"Action '{action}' is not a valid callable method")
+class Entity(UserDict):
+    """Central entity record. All game objects are entities.
 
-        response: EventType = method(**event.get("data", {}))
-        if event.get("callback"):
-            c = event["callback"]
-            data = c["data"]
-            data.update(response or {})
-            Call(c["tid"], "", c["uuid"], c["aspect"], c["action"], **data).now()
-        actor._save()
+    An entity lives in the entity table and holds shared fields: uuid, name,
+    location, connection_id, aspects, primary_aspect. Aspect-specific data
+    is stored in per-aspect tables and accessed via self.aspect("AspectName").
+    """
+
+    _tableName: str = "ENTITY_TABLE"
+
+    def __init__(self, uuid: IdType = None, tid: str = None):
+        """Initialize an Entity, loading from the entity table if uuid provided."""
+        super().__init__()
+        self._tid: str = tid or str(uuid4())
+        self._aspect_cache: Dict[str, Aspect] = {}
+        if uuid:
+            self._load(uuid)
+        else:
+            self.data["uuid"] = str(uuid4())
+            self.data["aspects"] = []
+            self.data["primary_aspect"] = ""
 
     @property
-    def connection_id(self):
+    def _table(self):
+        """Return the DynamoDB table for entity records."""
+        return get_dynamodb_table(self._tableName)
+
+    @property
+    def uuid(self) -> IdType:
+        """Return the UUID of this entity."""
+        return str(self.data["uuid"])
+
+    @property
+    def tid(self) -> str:
+        """Return the transaction/request ID."""
+        return self._tid
+
+    @property
+    def name(self) -> str:
+        """Return the display name of this entity."""
+        return self.data.get("name", self.uuid[:8])
+
+    @name.setter
+    def name(self, value: str):
+        """Set the display name."""
+        self.data["name"] = value
+
+    @property
+    def location(self) -> Optional[IdType]:
+        """Return the location UUID (containing entity/room)."""
+        return self.data.get("location")
+
+    @location.setter
+    def location(self, loc_id: IdType):
+        """Set the location, notifying departure and arrival."""
+        old_location = self.data.get("location")
+        self.data["location"] = loc_id
+        self._save()
+
+        entity_name = self.name
+
+        # Notify departure from old location
+        if old_location and old_location != loc_id:
+            self.broadcast_to_location(
+                old_location,
+                {
+                    "type": "depart",
+                    "actor": entity_name,
+                    "actor_uuid": self.uuid,
+                },
+            )
+
+        # Notify arrival at new location
+        if loc_id and loc_id != old_location:
+            self.broadcast_to_location(
+                loc_id,
+                {
+                    "type": "arrive",
+                    "actor": entity_name,
+                    "actor_uuid": self.uuid,
+                },
+            )
+
+    @property
+    def connection_id(self) -> Optional[str]:
         """Get the WebSocket connection ID if this entity is connected."""
         return self.data.get("connection_id")
 
     @connection_id.setter
-    def connection_id(self, value):
+    def connection_id(self, value: Optional[str]):
         """Set or clear the WebSocket connection ID."""
         if value:
             self.data["connection_id"] = value
         else:
             self.data.pop("connection_id", None)
         self._save()
+
+    @property
+    def contents(self) -> List[IdType]:
+        """Return UUIDs of all entities whose location is this entity's UUID.
+
+        Uses the contents GSI on the entity table.
+        """
+        return [
+            item["uuid"]
+            for item in self._table.query(
+                IndexName="contents",
+                Select="ALL_PROJECTED_ATTRIBUTES",
+                KeyConditionExpression=Key("location").eq(self.uuid),
+            )["Items"]
+        ]
+
+    @property
+    def tickDelay(self):
+        """Get the tick delay for the entity (default 30 seconds)."""
+        return self.data.get("tick_delay", 30)
+
+    def _load(self, uuid: IdType) -> None:
+        """Load entity state from the entity table."""
+        self.data = self._table.get_item(Key={"uuid": uuid}).get("Item", {})
+        if not self.data:
+            raise KeyError(f"Entity {uuid} not found")
+
+    def _save(self) -> None:
+        """Save entity state to the entity table."""
+        self._table.put_item(Item=self.data)
+
+    # --- Aspect Management ---
+
+    def aspect(self, aspect_name: str) -> Aspect:
+        """Load or lazily create an aspect for this entity.
+
+        If the aspect record doesn't exist in its table yet, an empty record
+        is created automatically (lazy creation principle).
+
+        Args:
+            aspect_name: Name of the aspect class (e.g., "Land", "Inventory").
+
+        Returns:
+            Aspect instance with entity back-reference set.
+        """
+        if aspect_name in self._aspect_cache:
+            return self._aspect_cache[aspect_name]
+
+        aspect_cls = get_aspect_class(aspect_name)
+        try:
+            instance = aspect_cls(uuid=self.uuid)
+        except KeyError:
+            # Lazy creation — auto-create empty aspect record
+            instance = aspect_cls.__new__(aspect_cls)
+            UserDict.__init__(instance)
+            instance.entity = None
+            instance.data = {"uuid": self.uuid}
+            instance._save()
+
+        instance.entity = self
+        self._aspect_cache[aspect_name] = instance
+        return instance
+
+    # --- Command Dispatch ---
+
+    @callable
+    def receive_command(self, command: str, **kwargs) -> dict:
+        """Receive and route a command to the appropriate aspect.
+
+        Scans aspect classes for the method *before* loading aspect data,
+        avoiding unnecessary reads. Primary aspect is checked first.
+        """
+        # Check for 'help' on Entity itself
+        if command == "help":
+            result = self.help(**kwargs)
+            if result:
+                self.push_event(result)
+            return result
+
+        # Build aspect search order: primary first, then others
+        primary = self.data.get("primary_aspect", "")
+        aspects = self.data.get("aspects", [])
+        aspect_order = []
+        if primary:
+            aspect_order.append(primary)
+        for a in aspects:
+            if a != primary and a not in aspect_order:
+                aspect_order.append(a)
+
+        for aspect_name in aspect_order:
+            try:
+                aspect_cls = get_aspect_class(aspect_name)
+            except ValueError:
+                continue
+
+            # Scan class for the method without loading data
+            method = getattr(aspect_cls, command, None)
+            if method and (
+                hasattr(method, "_is_player_command") or hasattr(method, "_is_callable")
+            ):
+                # Found it — now load the aspect data
+                aspect_instance = self.aspect(aspect_name)
+                bound_method = getattr(aspect_instance, command)
+                result = bound_method(**kwargs)
+                if result:
+                    self.push_event(result)
+                return result
+
+        # Not found
+        result = {"type": "error", "message": f"Unknown command: {command}"}
+        self.push_event(result)
+        return result
+
+    @callable
+    def help(self, command=None) -> dict:
+        """List available commands from all aspects, or get details on one.
+
+        Args:
+            command: Optional command name to get details for.
+
+        Returns:
+            dict with help info.
+        """
+        commands = {}
+
+        # Scan all aspects for @player_command methods
+        aspects = self.data.get("aspects", [])
+        for aspect_name in aspects:
+            try:
+                aspect_cls = get_aspect_class(aspect_name)
+            except ValueError:
+                continue
+
+            for cls in aspect_cls.__mro__:
+                if cls is UserDict or cls is object or cls is Aspect:
+                    continue
+                for attr_name in vars(cls):
+                    if attr_name.startswith("_"):
+                        continue
+                    attr = getattr(cls, attr_name, None)
+                    if attr is None:
+                        continue
+                    if hasattr(attr, "_is_player_command") and attr._is_player_command:
+                        if attr_name not in commands:
+                            doc = getattr(attr, "__doc__", "") or ""
+                            first_line = (
+                                doc.strip().split("\n")[0] if doc.strip() else "No description."
+                            )
+                            commands[attr_name] = {
+                                "name": attr_name,
+                                "summary": first_line,
+                                "doc": doc.strip(),
+                            }
+
+        # Always include help itself
+        if "help" not in commands:
+            commands["help"] = {
+                "name": "help",
+                "summary": "List available commands, or get details on a specific command.",
+                "doc": "List available commands, or get details on a specific command.",
+            }
+
+        if command:
+            cmd_info = commands.get(command)
+            if cmd_info:
+                return {
+                    "type": "help_detail",
+                    "command": command,
+                    "description": cmd_info["doc"],
+                }
+            return {"type": "error", "message": f"Unknown command: {command}"}
+
+        return {
+            "type": "help",
+            "commands": [
+                {"name": c["name"], "summary": c["summary"]}
+                for c in sorted(commands.values(), key=lambda x: x["name"])
+            ],
+        }
+
+    # Mark help as a player command
+    help._is_player_command = True
+
+    # --- WebSocket / Connection ---
 
     def push_event(self, event: Dict) -> None:
         """Push an event to the connected WebSocket, if any."""
@@ -286,127 +509,125 @@ class Thing(UserDict):
         self._save()
         return {"status": "disconnected", "entity_uuid": self.uuid}
 
-    @callable
-    def receive_command(self, command: str, **kwargs) -> dict:
-        """Receive and route a command from WebSocket to a @player_command method."""
-        method = getattr(self, command, None)
-        if method is None:
-            result = {"error": f"Unknown command: {command}"}
-            self.push_event(result)
-            return result
-        # Check if the method is marked as player-callable
-        if not hasattr(method, "_is_player_command") and not hasattr(method, "_is_callable"):
-            result = {"error": f"Command '{command}' is not available"}
-            self.push_event(result)
-            return result
-        result = method(**kwargs)
-        if result:
-            self.push_event(result)
-        return result
+    # --- Location Broadcasting ---
 
-    @callable
-    def help(self, command=None) -> dict:
-        """List available commands, or get details on a specific command.
+    def broadcast_to_location(
+        self, location_uuid: IdType, event: Dict, exclude_self: bool = True
+    ) -> None:
+        """Broadcast an event to all connected entities at a location.
 
-        Args:
-            command: Optional command name to get details for.
-
-        Returns:
-            dict with help info.
+        Uses the entity table's contents GSI to find entities at the location.
         """
-        commands = {}
-        for cls in type(self).__mro__:
-            for attr_name in vars(cls):
-                if attr_name.startswith("_"):
-                    continue
-                attr = getattr(cls, attr_name, None)
-                if attr is None:
-                    continue
-                if hasattr(attr, "_is_player_command") and attr._is_player_command:
-                    if attr_name not in commands:
-                        doc = getattr(attr, "__doc__", "") or ""
-                        first_line = (
-                            doc.strip().split("\n")[0] if doc.strip() else "No description."
-                        )
-                        commands[attr_name] = {
-                            "name": attr_name,
-                            "summary": first_line,
-                            "doc": doc.strip(),
-                        }
-
-        if command:
-            cmd_info = commands.get(command)
-            if cmd_info:
-                return {
-                    "type": "help_detail",
-                    "command": command,
-                    "description": cmd_info["doc"],
-                }
-            return {"type": "error", "message": f"Unknown command: {command}"}
-
-        return {
-            "type": "help",
-            "commands": [
-                {"name": c["name"], "summary": c["summary"]}
-                for c in sorted(commands.values(), key=lambda x: x["name"])
-            ],
-        }
-
-    # Mark help as a player command (can't use @player_command decorator due to import cycle)
-    help._is_player_command = True
-
-    def broadcast_location_event(self, event: Dict) -> None:
-        """Broadcast an event to all connected entities at the same location as this entity.
-
-        Requires the entity to have a 'location' field in its data.
-        Skips self.
-        """
-        location_uuid = self.data.get("location")
         if not location_uuid:
             return
-
-        # Import here to avoid circular imports
-        from aspects.aws_client import get_dynamodb_table
-
-        table = get_dynamodb_table("LOCATION_TABLE")
         try:
-            from boto3.dynamodb.conditions import Key
-
-            result = table.query(
-                IndexName="contents",
-                Select="ALL_PROJECTED_ATTRIBUTES",
-                KeyConditionExpression=Key("location").eq(location_uuid),
-            )
-            for item in result.get("Items", []):
-                if item["uuid"] == self.uuid:
+            loc_entity = Entity(uuid=location_uuid)
+            for entity_uuid in loc_entity.contents:
+                if exclude_self and entity_uuid == self.uuid:
                     continue
                 try:
-                    entity = Thing(uuid=item["uuid"])
-                    entity.push_event(event)
+                    other = Entity(uuid=entity_uuid)
+                    other.push_event(event)
                 except (KeyError, Exception):
                     pass
-        except Exception as e:
+        except (KeyError, Exception) as e:
             logging.debug(f"Could not broadcast to location {location_uuid}: {e}")
 
-    def _sendEvent(self, event: EventType) -> str:
-        """Send an event to the SNS topic with current object's tid and uuid."""
-        sendEvent: Dict = {
-            "default": "",
-            "tid": self.tid,
-            "actor_uuid": self.data["uuid"],
-        }
-        sendEvent.update(event or {})
-        topic = get_sns_topic("THING_TOPIC_ARN")
-        return topic.publish(Message=json.dumps(sendEvent), MessageStructure="json")
+    # --- SNS Event System ---
+
+    @classmethod
+    def _action(cls, event: EventType):
+        """Process an incoming SNS action/event on an entity."""
+        action = event.get("action", "")
+
+        if action.startswith("_"):
+            raise ValueError(f"Action '{action}' is not allowed (private methods are prohibited)")
+
+        uuid = event.get("uuid")
+        if not uuid:
+            if action != "create":
+                raise ValueError("UUID is required for non-create actions")
+        tid = str(event.get("tid") or uuid4())
+
+        # Load the entity
+        entity = Entity(uuid, tid)
+
+        # Check if it's an entity-level action
+        method = getattr(entity, action, None)
+        if method and hasattr(method, "_is_callable"):
+            response = method(**event.get("data", {}))
+            if event.get("callback"):
+                c = event["callback"]
+                data = c["data"]
+                data.update(response or {})
+                Call(c["tid"], "", c["uuid"], c["aspect"], c["action"], **data).now()
+            entity._save()
+            return
+
+        # Otherwise dispatch to the right aspect
+        aspect_name = event.get("aspect", "")
+        if aspect_name:
+            try:
+                aspect_instance = entity.aspect(aspect_name)
+                aspect_method = getattr(aspect_instance, action, None)
+                if aspect_method and hasattr(aspect_method, "_is_callable"):
+                    response = aspect_method(**event.get("data", {}))
+                    if event.get("callback"):
+                        c = event["callback"]
+                        data = c["data"]
+                        data.update(response or {})
+                        Call(c["tid"], "", c["uuid"], c["aspect"], c["action"], **data).now()
+                    aspect_instance._save()
+                    entity._save()
+                    return
+            except ValueError:
+                pass
+
+        raise ValueError(f"Action '{action}' not found on entity or aspect '{aspect_name}'")
+
+    # --- Tick System ---
+
+    @callable
+    def tick(self) -> None:
+        """Schedule this entity's next tick."""
+        self.schedule_next_tick()
+
+    @callable
+    def schedule_next_tick(self) -> None:
+        """Schedule the entity's next tick after tickDelay seconds."""
+        primary = self.data.get("primary_aspect", "Entity")
+        Call(str(uuid4()), self.uuid, self.uuid, primary, "tick").after(
+            seconds=self.tickDelay
+        )
+
+    # --- Call Helpers ---
 
     def call(self, uuid: IdType, aspect: str, action: str, **kwargs):
-        """Build a Call object to target another aspect/action."""
-        return Call(self.tid, self.uuid, uuid, aspect, action, **kwargs)  # type: ignore
+        """Build a Call object to target another entity's aspect/action."""
+        return Call(self.tid, self.uuid, uuid, aspect, action, **kwargs)
 
     def callAspect(self, aspect: str, action: str, **kwargs):
-        """Call an aspect on this object."""
-        return self.call(self.uuid, aspect, action, **kwargs)  # type: ignore
+        """Call an aspect on this entity."""
+        return self.call(self.uuid, aspect, action, **kwargs)
 
-    def createAspect(self, aspect: str) -> None:
-        """Create a new aspect for this object's uuid."""
-        self.call(self.uuid, aspect, "create")
+    # --- Destroy ---
+
+    @callable
+    def destroy(self) -> None:
+        """Delete this entity and all its aspect records."""
+        # Delete aspect records
+        for aspect_name in self.data.get("aspects", []):
+            try:
+                aspect_cls = get_aspect_class(aspect_name)
+                table = get_dynamodb_table(aspect_cls._tableName)
+                table.delete_item(Key={"uuid": self.uuid})
+            except (ValueError, Exception) as e:
+                logging.debug(f"Could not delete aspect {aspect_name}: {e}")
+
+        # Delete entity record
+        self._table.delete_item(Key={"uuid": self.uuid})
+        logging.info(f"{self.uuid} has been destroyed")
+
+
+# Backward compatibility alias
+Thing = Entity

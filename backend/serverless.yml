@@ -12,6 +12,7 @@ custom:
     pythonBin: python3
   defaultRegion: ap-southeast-1
   tables:
+    entityName: 'entity-table-${self:provider.stage}'
     thingName: 'thing-table-${self:provider.stage}'
     locationName: 'location-table-${self:provider.stage}'
     landName: 'land-table-${self:provider.stage}'
@@ -39,6 +40,7 @@ provider:
         - dynamodb:UpdateItem
         - dynamodb:DeleteItem
       Resource:
+        - { "Fn::GetAtt": ["EntityDynamoDBTable", "Arn" ] }
         - { "Fn::GetAtt": ["ThingDynamoDBTable", "Arn" ] }
         - { "Fn::GetAtt": ["LocationDynamoDBTable", "Arn" ] }
         - { "Fn::GetAtt": ["LandDynamoDBTable", "Arn" ] }
@@ -56,6 +58,7 @@ provider:
       Resource:
         - "arn:aws:execute-api:#{AWS::Region}:#{AWS::AccountId}:*/@connections/*"
   environment:
+    ENTITY_TABLE: ${self:custom.tables.entityName}
     THING_TABLE: ${self:custom.tables.thingName}
     LOCATION_TABLE: ${self:custom.tables.locationName}
     LAND_TABLE: ${self:custom.tables.landName}
@@ -375,6 +378,34 @@ resources:
               }
             }
           }
+
+    EntityDynamoDBTable:
+      Type: 'AWS::DynamoDB::Table'
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: uuid
+            AttributeType: S
+          - AttributeName: location
+            AttributeType: S
+        KeySchema:
+          - AttributeName: uuid
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: "contents"
+            KeySchema:
+              - AttributeName: location
+                KeyType: HASH
+              - AttributeName: uuid
+                KeyType: RANGE
+            Projection:
+              ProjectionType: KEYS_ONLY
+            ProvisionedThroughput:
+              ReadCapacityUnits: 1
+              WriteCapacityUnits: 1
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        TableName: ${self:custom.tables.entityName}
 
     ThingDynamoDBTable:
       Type: 'AWS::DynamoDB::Table'

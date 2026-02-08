@@ -1,119 +1,58 @@
-"""Location module for handling location-aware entities and exits."""
+"""Location aspect — exits and spatial connections.
+
+A thin Aspect subclass that owns exit management: exits, add_exit, remove_exit.
+Land inherits from Location and adds grid-based world features.
+
+Shared fields (location, contents, name, connection_id) live on Entity,
+not on this aspect. Access them via self.entity.*.
+"""
 
 import logging
-from typing import Dict, List, Optional
-
-from boto3.dynamodb.conditions import Key
+from typing import Dict
 
 from aspects.handler import lambdaHandler
-from aspects.thing import IdType, Thing, callable
+from aspects.thing import Aspect, Entity, IdType, callable
 
 logger = logging.getLogger(__name__)
 
 ExitsType = Dict[str, IdType]
 
 
-class Location(Thing):
-    """All location-aware things will have a Location aspect."""
+class Location(Aspect):
+    """Aspect handling exits and spatial connections.
+
+    Stores: exits (dict of direction -> destination UUID).
+    """
 
     _tableName = "LOCATION_TABLE"
+
+    def __init__(self, uuid: IdType = None):
+        """Initialize Location, setting up empty exits if new."""
+        super().__init__(uuid)
+        if not uuid:
+            # New aspect record — initialize exits
+            self.data.setdefault("exits", {})
 
     @property
     def exits(self) -> ExitsType:
         """Return the exits for this location."""
-        return self.data["exits"]
+        return self.data.get("exits", {})
 
     @callable
     def add_exit(self, direction: str, destination: IdType) -> ExitsType:
         """Add an exit in a direction to a destination."""
-        self.data["exits"][direction] = destination
+        self.data.setdefault("exits", {})[direction] = destination
         self._save()
         return self.data["exits"]
 
     @callable
     def remove_exit(self, direction: str) -> ExitsType:
         """Remove the exit in the specified direction."""
-        if direction in self.data["exits"]:
-            del self.data["exits"][direction]
+        exits = self.data.get("exits", {})
+        if direction in exits:
+            del exits[direction]
             self._save()
-        return self.data["exits"]
-
-    @property
-    def contents(self) -> List[IdType]:
-        """Return a list of UUIDs for items at this location."""
-        return [  # TODO: factor this out to deal with large response sets
-            item["uuid"]
-            for item in self._table.query(
-                IndexName="contents",
-                Select="ALL_PROJECTED_ATTRIBUTES",
-                KeyConditionExpression=Key("location").eq(self.uuid),
-            )["Items"]
-        ]
-
-    @property
-    def location(self) -> Optional[IdType]:
-        """Return the location ID for this item."""
-        return self.data["location"]
-
-    @location.setter
-    def location(self, loc_id: IdType):
-        """Set the location ID for this item, notifying both locations."""
-        old_location = self.data.get("location")
-        self.data["location"] = loc_id
-        self._save()
-
-        entity_name = self.data.get("name", self.uuid[:8])
-
-        # Notify departure from old location
-        if old_location and old_location != loc_id:
-            self._notify_location(
-                old_location,
-                {
-                    "type": "depart",
-                    "actor": entity_name,
-                    "actor_uuid": self.uuid,
-                },
-            )
-
-        # Notify arrival at new location
-        if loc_id and loc_id != old_location:
-            self._notify_location(
-                loc_id,
-                {
-                    "type": "arrive",
-                    "actor": entity_name,
-                    "actor_uuid": self.uuid,
-                },
-            )
-
-    def _notify_location(self, location_uuid: IdType, event: dict):
-        """Push an event to all connected entities at a location, except self."""
-        try:
-            loc = Location(uuid=location_uuid)
-            for entity_uuid in loc.contents:
-                if entity_uuid == self.uuid:
-                    continue
-                try:
-                    entity = Thing(uuid=entity_uuid)
-                    entity.push_event(event)
-                except (KeyError, Exception):
-                    pass
-        except (KeyError, Exception):
-            pass
-
-    @callable
-    def create(self) -> None:
-        """Create a new location and initialize exits."""
-        self.data["exits"] = {}
-        super().create()
-
-    @callable
-    def destroy(self):
-        """Destroy this location and move contents elsewhere."""
-        dest = self.location or "Nowhere"  # TODO: Figure out a better location for dropping objects
-        for item in self.contents:
-            Location(item, self.tid).location = dest
-        self._table.delete_item(Key={"uuid": self.uuid})
+        return self.data.get("exits", {})
 
 
-handler = lambdaHandler(Location)
+handler = lambdaHandler(Entity)

@@ -53,7 +53,7 @@ from aspects import land, landCreator, location
 from aspects.auth import _generate_jwt, verify_jwt
 from aspects.aws_client import get_dynamodb_table
 from aspects.land import Land
-from aspects.thing import Call, Thing
+from aspects.thing import Call, Entity
 
 # Try to import optional aspects
 try:
@@ -94,45 +94,25 @@ def _local_push_event(self, event):
         logger.error(f"Failed to push event to {conn_id}: {e}")
 
 
-# Monkey-patch Thing.push_event to use local WebSocket instead of API Gateway
-Thing.push_event = _local_push_event
+# Monkey-patch Entity.push_event to use local WebSocket instead of API Gateway
+Entity.push_event = _local_push_event
 
 
 # ---------------------------------------------------------------------------
-# Aspect registry — maps aspect names to handler classes
+# Aspect dispatch — Entity handles dispatch internally now
 # ---------------------------------------------------------------------------
-
-ASPECT_MAP = {
-    "Thing": Thing,
-    "Location": location.Location,
-    "Land": land.Land,
-    "LandCreator": landCreator.LandCreator,
-}
-
-if communication:
-    ASPECT_MAP["Communication"] = communication.Communication
-if inventory:
-    ASPECT_MAP["Inventory"] = inventory.Inventory
-if npc:
-    ASPECT_MAP["NPC"] = npc.NPC
-if suggestion:
-    ASPECT_MAP["Suggestion"] = suggestion.Suggestion
 
 
 def dispatch_sns_event(event_data: dict):
-    """Process an SNS event by routing it to the correct aspect handler.
+    """Process an SNS event by routing it to Entity._action.
 
-    This replaces the Lambda + SNS infrastructure for local development.
+    In the entity table architecture, all events go through Entity._action
+    which handles dispatch to the correct aspect.
     """
-    aspect_name = event_data.get("aspect")
-    cls = ASPECT_MAP.get(aspect_name)
-    if cls is None:
-        logger.warning(f"No handler for aspect: {aspect_name}")
-        return
     try:
-        cls._action(event_data)
+        Entity._action(event_data)
     except Exception as e:
-        logger.error(f"Error handling {aspect_name}.{event_data.get('action')}: {e}")
+        logger.error(f"Error handling {event_data.get('aspect')}.{event_data.get('action')}: {e}")
 
 
 # Monkey-patch Call.now() to dispatch locally instead of via SNS
@@ -140,7 +120,7 @@ _original_call_now = Call.now
 
 
 def _local_call_now(self):
-    """Route Call.now() directly to aspect handlers instead of SNS."""
+    """Route Call.now() directly to Entity._action instead of SNS."""
     logger.debug(f"Local dispatch: {self.data.get('aspect')}.{self.data.get('action')}")
     dispatch_sns_event(self.data)
 
@@ -239,35 +219,49 @@ def dev_api_key_login(api_key: str) -> dict:
 def get_or_create_player_entity(user_id: str, name: str = "Player") -> dict:
     """Get or create a mobile player entity located at the origin room.
 
-    The player entity is a Land record whose ``location`` field points to
-    the room it is currently in.  ``look()`` and ``move()`` on Land now
-    resolve the current room via ``_current_room()`` so the player
-    navigates the map correctly.
-    Returns {uuid, aspect} for the possess command.
+    The player entity is an Entity record with Land, Inventory, Communication,
+    and Suggestion aspects. It is located at the origin room.
+
+    Returns {uuid} for the possess command.
     """
     import uuid as uuid_module
 
     entity_uuid = str(uuid_module.uuid5(uuid_module.NAMESPACE_DNS, "player-" + user_id))
 
-    # Try to load existing player entity
+    # Try to load existing player entity from entity table
     try:
-        entity = Land(uuid=entity_uuid)
+        entity = Entity(uuid=entity_uuid)
         logger.info(f"Found existing player entity {entity_uuid}")
-        return {"uuid": entity_uuid, "aspect": "Land"}
+        return {"uuid": entity_uuid}
     except (KeyError, Exception):
         pass
 
-    # Create new player entity at the origin room
+    # Create new player entity at the origin room.
     origin_uuid = Land.by_coordinates((0, 0, 0))
     logger.info(f"Creating player entity {entity_uuid} at origin {origin_uuid}")
-    entity = Land()  # creates with a random UUID
-    entity.data["uuid"] = entity_uuid  # override to our deterministic UUID
-    entity.data["name"] = name
-    entity.data["location"] = origin_uuid
-    entity.data["coordinates"] = Land._convertCoordinatesForStorage((0, 0, 0))
-    entity.data["exits"] = {}
-    entity._save()
-    return {"uuid": entity_uuid, "aspect": "Land"}
+
+    # Write entity record to entity table
+    entity_table = get_dynamodb_table("ENTITY_TABLE")
+    entity_table.put_item(
+        Item={
+            "uuid": entity_uuid,
+            "name": name,
+            "location": origin_uuid,
+            "aspects": ["Land", "Inventory", "Communication", "Suggestion"],
+            "primary_aspect": "Land",
+        }
+    )
+
+    # Create inventory aspect record for the player (carry capacity)
+    loc_table = get_dynamodb_table("LOCATION_TABLE")
+    loc_table.put_item(
+        Item={
+            "uuid": entity_uuid,
+            "carry_capacity": 50,  # weight units the player can carry
+        }
+    )
+
+    return {"uuid": entity_uuid}
 
 
 # ---------------------------------------------------------------------------
@@ -461,7 +455,6 @@ async def _handle_ws_command(ws, connection_id, command, data, claims):
     """Route a WebSocket command to the appropriate handler."""
     if command == "possess":
         entity_uuid = data.get("entity_uuid")
-        entity_aspect = data.get("entity_aspect", "Land")
 
         if not entity_uuid:
             # Auto-create player entity
@@ -469,43 +462,48 @@ async def _handle_ws_command(ws, connection_id, command, data, claims):
             user_name = claims.get("bot_name") or claims.get("name") or "Player"
             entity_info = get_or_create_player_entity(user_id, user_name)
             entity_uuid = entity_info["uuid"]
-            entity_aspect = entity_info["aspect"]
 
         # Detach from any current entity
         _detach_connection(connection_id)
 
-        # Attach to new entity
-        cls = ASPECT_MAP.get(entity_aspect, Land)
+        # Attach to new entity — if the requested entity doesn't exist
+        # (e.g. after a server restart wiped LocalStack), create a fresh one.
         try:
-            entity = cls(uuid=entity_uuid)
-            entity.data["connection_id"] = connection_id
-            entity._save()
-
-            await ws.send_json(
-                {
-                    "type": "system",
-                    "message": f"Now controlling entity {entity.data.get('name', entity_uuid[:8])} [{entity_uuid[:8]}]",
-                }
+            entity = Entity(uuid=entity_uuid)
+        except (KeyError, Exception):
+            logger.warning(
+                f"Entity {entity_uuid} not found, creating new player entity"
             )
+            user_id = claims.get("sub", DEV_USER_UID)
+            user_name = claims.get("bot_name") or claims.get("name") or "Player"
+            entity_info = get_or_create_player_entity(user_id, user_name)
+            entity_uuid = entity_info["uuid"]
+            entity = Entity(uuid=entity_uuid)
 
-            # Auto-look on possess
-            if hasattr(entity, "look"):
-                try:
-                    result = entity.look()
-                    if result:
-                        await ws.send_json(result)
-                except Exception as e:
-                    logger.warning(f"Auto-look failed: {e}")
+        entity.data["connection_id"] = connection_id
+        entity._save()
 
-        except KeyError:
-            await ws.send_json(
-                {"type": "error", "message": f"Entity {entity_uuid} not found"}
-            )
+        await ws.send_json(
+            {
+                "type": "system",
+                "message": f"Now controlling entity {entity.name} [{entity_uuid[:8]}]",
+            }
+        )
+
+        # Auto-look on possess
+        try:
+            land_aspect = entity.aspect("Land")
+            result = land_aspect.look()
+            if result:
+                await ws.send_json(result)
+        except Exception as e:
+            logger.warning(f"Auto-look failed: {e}")
+
         return
 
     # For all other commands, find the entity by connection_id
-    entity_info = _find_entity_by_connection(connection_id)
-    if not entity_info:
+    entity_uuid = _find_entity_by_connection(connection_id)
+    if not entity_uuid:
         await ws.send_json(
             {
                 "type": "error",
@@ -514,15 +512,14 @@ async def _handle_ws_command(ws, connection_id, command, data, claims):
         )
         return
 
-    # Load the entity and run the command
-    cls = ASPECT_MAP.get(entity_info["aspect"], Land)
+    # Load the entity and run the command through receive_command
     try:
-        entity = cls(uuid=entity_info["uuid"])
+        entity = Entity(uuid=entity_uuid)
     except KeyError:
         await ws.send_json({"type": "error", "message": "Entity not found"})
         return
 
-    # Route through receive_command
+    # Route through receive_command on Entity
     result = entity.receive_command(command=command, **data)
     # receive_command already calls push_event for the calling entity,
     # but if it returned something and push_event didn't fire (no connection),
@@ -531,36 +528,26 @@ async def _handle_ws_command(ws, connection_id, command, data, claims):
         await ws.send_json(result)
 
 
-def _find_entity_by_connection(connection_id: str) -> dict:
-    """Find entity with this connection_id by scanning all entity tables."""
-    # Players typically live in LAND_TABLE, but check all tables
-    for table_env, default_aspect in [
-        ("LAND_TABLE", "Land"),
-        ("LOCATION_TABLE", "Location"),
-        ("THING_TABLE", "Thing"),
-    ]:
-        try:
-            table = get_dynamodb_table(table_env)
-            response = table.scan(
-                FilterExpression="connection_id = :cid",
-                ExpressionAttributeValues={":cid": connection_id},
-            )
-            items = response.get("Items", [])
-            if items:
-                item = items[0]
-                return {
-                    "uuid": item["uuid"],
-                    "aspect": item.get("aspect", default_aspect),
-                }
-        except Exception as e:
-            logger.debug(f"Error scanning {table_env} for connection: {e}")
+def _find_entity_by_connection(connection_id: str) -> str:
+    """Find entity UUID with this connection_id by scanning the entity table."""
+    try:
+        table = get_dynamodb_table("ENTITY_TABLE")
+        response = table.scan(
+            FilterExpression="connection_id = :cid",
+            ExpressionAttributeValues={":cid": connection_id},
+        )
+        items = response.get("Items", [])
+        if items:
+            return items[0]["uuid"]
+    except Exception as e:
+        logger.debug(f"Error scanning entity table for connection: {e}")
     return None
 
 
 def _detach_connection(connection_id: str):
     """Clear connection_id from any entity that has it."""
     try:
-        table = get_dynamodb_table("THING_TABLE")
+        table = get_dynamodb_table("ENTITY_TABLE")
         response = table.scan(
             FilterExpression="connection_id = :cid",
             ExpressionAttributeValues={":cid": connection_id},
@@ -574,43 +561,7 @@ def _detach_connection(connection_id: str):
                 f"Detached connection {connection_id} from entity {item['uuid']}"
             )
     except Exception as e:
-        logger.error(f"Error detaching connection from thing table: {e}")
-
-    # Also check Location table for entities with connection_id
-    try:
-        table = get_dynamodb_table("LOCATION_TABLE")
-        response = table.scan(
-            FilterExpression="connection_id = :cid",
-            ExpressionAttributeValues={":cid": connection_id},
-        )
-        for item in response.get("Items", []):
-            table.update_item(
-                Key={"uuid": item["uuid"]},
-                UpdateExpression="REMOVE connection_id",
-            )
-            logger.info(
-                f"Detached connection {connection_id} from location entity {item['uuid']}"
-            )
-    except Exception as e:
-        logger.error(f"Error detaching connection from location table: {e}")
-
-    # Also check Land table
-    try:
-        table = get_dynamodb_table("LAND_TABLE")
-        response = table.scan(
-            FilterExpression="connection_id = :cid",
-            ExpressionAttributeValues={":cid": connection_id},
-        )
-        for item in response.get("Items", []):
-            table.update_item(
-                Key={"uuid": item["uuid"]},
-                UpdateExpression="REMOVE connection_id",
-            )
-            logger.info(
-                f"Detached connection {connection_id} from land entity {item['uuid']}"
-            )
-    except Exception as e:
-        logger.error(f"Error detaching connection from land table: {e}")
+        logger.error(f"Error detaching connection from entity table: {e}")
 
 
 # ---------------------------------------------------------------------------
@@ -638,8 +589,13 @@ async def wait_for_localstack():
             table_names = tables.get("TableNames", [])
             logger.info(f"LocalStack ready. Tables: {table_names}")
 
-            # Check if our tables exist
-            required = ["thing-table-local", "location-table-local", "land-table-local"]
+            # Check if our tables exist (entity table is the key one now)
+            required = [
+                "entity-table-local",
+                "thing-table-local",
+                "location-table-local",
+                "land-table-local",
+            ]
             missing = [t for t in required if t not in table_names]
             if missing:
                 logger.warning(f"Missing tables: {missing}. Waiting for init script...")
@@ -661,48 +617,117 @@ async def wait_for_localstack():
 
 
 def ensure_origin_world():
-    """Create the origin land tile (0,0,0) if it doesn't exist."""
+    """Create the origin land tile (0,0,0) if it doesn't exist.
+
+    Uses the worldgen system to generate the origin room with proper
+    biome, exits, terrain, and description.
+    """
     try:
         origin_uuid = Land.by_coordinates((0, 0, 0))
         origin = Land(uuid=origin_uuid)
-        if not origin.description:
-            origin.description = (
-                "The starting point. A crossroads of paths stretching into the unknown."
-            )
         logger.info(f"Origin land exists: {origin_uuid}")
 
-        # Ensure exits from origin (bidirectional)
-        opposite = {
-            "north": "south",
-            "south": "north",
-            "east": "west",
-            "west": "east",
-            "up": "down",
-            "down": "up",
-        }
-        if not origin.exits:
-            for direction in ["north", "south", "east", "west"]:
-                try:
-                    new_coord = Land._new_coords_by_direction((0, 0, 0), direction)
-                    dest_uuid = Land.by_coordinates(new_coord)
-                    origin.add_exit(direction, dest_uuid)
-                    # Add return exit on the neighbor back to origin
-                    neighbor = Land(uuid=dest_uuid)
-                    if opposite[direction] not in neighbor.exits:
-                        neighbor.add_exit(opposite[direction], origin.uuid)
-                except Exception as e:
-                    logger.debug(f"Could not create exit {direction}: {e}")
-            logger.info(f"Created exits from origin: {list(origin.exits.keys())}")
+        # If origin hasn't been generated yet, run worldgen
+        if not origin.data.get("generated"):
+            _generate_origin(origin)
 
     except Exception as e:
         logger.info(f"Creating origin world: {e}")
         origin = Land()
         origin.coordinates = (0, 0, 0)
+        # Also create entity record for the origin room
+        entity = Entity()
+        entity.data["uuid"] = origin.uuid
+        entity.data["name"] = "The Origin"
+        entity.data["aspects"] = ["Land"]
+        entity.data["primary_aspect"] = "Land"
+        entity._save()
+        _generate_origin(origin)
+        logger.info(f"Created origin land: {origin.uuid}")
+
+
+def _generate_origin(origin):
+    """Generate the origin room using the worldgen system."""
+    from aspects.worldgen import generate_room
+    from aspects.worldgen.base import GenerationContext
+
+    context = GenerationContext(
+        came_from=None,
+        came_from_description=None,
+        came_from_biome=None,
+    )
+
+    try:
+        blueprint = generate_room((0, 0, 0), context)
+
+        # Override description for the origin — it's special
+        origin.data["description"] = (
+            "The starting point. A crossroads of paths stretching "
+            "into the unknown. " + (blueprint.description or "")
+        ).strip()
+
+        # Apply exits (resolve coords → UUIDs, bidirectional)
+        opposite = {
+            "north": "south", "south": "north",
+            "east": "west", "west": "east",
+            "up": "down", "down": "up",
+        }
+        for direction, dest_coords in blueprint.exits.items():
+            if direction in origin.exits:
+                continue
+            try:
+                dest_uuid = Land.by_coordinates(dest_coords)
+                origin.add_exit(direction, dest_uuid)
+                neighbor = Land(uuid=dest_uuid)
+                reverse = opposite.get(direction)
+                if reverse and reverse not in neighbor.exits:
+                    neighbor.add_exit(reverse, origin.uuid)
+            except Exception as ex:
+                logger.debug(f"Could not create exit {direction}: {ex}")
+
+        # Create terrain entities
+        for terrain_spec in blueprint.terrain:
+            Land._create_terrain_entity(origin, terrain_spec)
+
+        # Store metadata
+        origin.data["biome"] = blueprint.biome
+        origin.data["scale"] = blueprint.scale
+        origin.data["tags"] = blueprint.tags
+        origin.data["distant_features"] = blueprint.distant_features
+        if blueprint.landmark:
+            origin.data["landmark"] = blueprint.landmark
+        origin.data["generated"] = True
+        origin._save()
+
+        logger.info(
+            f"Generated origin room: biome={blueprint.biome}, "
+            f"exits={list(blueprint.exits.keys())}"
+        )
+
+    except Exception as e:
+        logger.warning(f"Worldgen failed for origin, using fallback: {e}")
         origin.data["description"] = (
             "The starting point. A crossroads of paths stretching into the unknown."
         )
+        # Ensure at least 4 cardinal exits
+        opposite = {
+            "north": "south", "south": "north",
+            "east": "west", "west": "east",
+        }
+        for direction in ["north", "south", "east", "west"]:
+            if direction not in origin.exits:
+                try:
+                    new_coord = Land._new_coords_by_direction((0, 0, 0), direction)
+                    dest_uuid = Land.by_coordinates(new_coord)
+                    origin.add_exit(direction, dest_uuid)
+                    neighbor = Land(uuid=dest_uuid)
+                    if opposite[direction] not in neighbor.exits:
+                        neighbor.add_exit(opposite[direction], origin.uuid)
+                except Exception as ex:
+                    logger.debug(f"Could not create exit {direction}: {ex}")
+        origin.data["generated"] = True
         origin._save()
-        logger.info(f"Created origin land: {origin.uuid}")
+        logger.info(f"Created origin with fallback: exits={list(origin.exits.keys())}")
 
 
 # ---------------------------------------------------------------------------
