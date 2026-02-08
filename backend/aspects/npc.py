@@ -3,6 +3,9 @@
 NPCs are entities with autonomous behavior that runs on tick().
 They use the same @callable event system as everything else - they're
 just entities that act on their own schedule.
+
+Shared fields (name, location, contents, connection_id) live on Entity,
+not on this aspect. Access them via self.entity.*.
 """
 
 import logging
@@ -11,8 +14,7 @@ from typing import Optional
 
 from .handler import lambdaHandler
 from .land import Land
-from .location import Location
-from .thing import Thing, callable
+from .thing import Aspect, Entity, callable
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +43,7 @@ GREETINGS = {
 }
 
 
-class NPC(Location):
+class NPC(Aspect):
     """An entity with autonomous behavior.
 
     NPCs have a behavior field that determines how they act on each tick:
@@ -51,7 +53,11 @@ class NPC(Location):
     - merchant: stay put, offer trades
 
     NPCs react to player presence (arrival events) by speaking.
+
+    Stores: behavior, patrol_route, patrol_index, greeted, is_npc.
     """
+
+    _tableName = "LOCATION_TABLE"  # Share table for now
 
     @callable
     def create(self, behavior: str = "wander", name: str = "a stranger", **kwargs):
@@ -62,13 +68,15 @@ class NPC(Location):
             name: Display name for the NPC.
             **kwargs: Additional NPC properties (e.g., patrol_route, inventory).
         """
-        super().create()
         self.data["behavior"] = behavior
-        self.data["name"] = name
         self.data["is_npc"] = True
         self.data.update(kwargs)
         self._save()
-        self.schedule_next_tick()
+        # Set entity name
+        if self.entity:
+            self.entity.name = name
+            self.entity._save()
+            self.entity.schedule_next_tick()
 
     @callable
     def tick(self):
@@ -86,11 +94,12 @@ class NPC(Location):
         elif behavior == "hermit":
             self._hermit()
 
-        self.schedule_next_tick()
+        if self.entity:
+            self.entity.schedule_next_tick()
 
     def _wander(self):
         """Move randomly through available exits."""
-        loc_uuid = self.location
+        loc_uuid = self.entity.location if self.entity else None
         if not loc_uuid:
             return
 
@@ -120,7 +129,8 @@ class NPC(Location):
         next_idx = (current_idx + 1) % len(route)
         dest_uuid = route[next_idx]
 
-        self._move_to(self.location, dest_uuid)
+        loc_uuid = self.entity.location if self.entity else None
+        self._move_to(loc_uuid, dest_uuid)
         self.data["patrol_index"] = next_idx
         self._save()
 
@@ -138,55 +148,47 @@ class NPC(Location):
 
     def _move_to(self, from_uuid: str, to_uuid: str, direction: Optional[str] = None):
         """Move NPC from one location to another, notifying both locations."""
-        npc_name = self.data.get("name", "someone")
+        npc_name = self.entity.name if self.entity else "someone"
 
         # Notify departure
-        self._broadcast_to_location(
-            from_uuid,
-            {
-                "type": "depart",
-                "actor": npc_name,
-                "actor_uuid": self.uuid,
-                "direction": direction or "away",
-            },
-        )
+        if self.entity:
+            self.entity.broadcast_to_location(
+                from_uuid,
+                {
+                    "type": "depart",
+                    "actor": npc_name,
+                    "actor_uuid": self.entity.uuid,
+                    "direction": direction or "away",
+                },
+            )
 
-        # Update location
-        self.location = to_uuid
-
-        # Notify arrival
-        self._broadcast_to_location(
-            to_uuid,
-            {
-                "type": "arrive",
-                "actor": npc_name,
-                "actor_uuid": self.uuid,
-            },
-        )
+        # Update location (writes to entity table, sends arrival notification)
+        if self.entity:
+            self.entity.location = to_uuid
 
     def _check_for_players(self):
         """Check if any connected players are at this location and greet them."""
-        loc_uuid = self.location
+        loc_uuid = self.entity.location if self.entity else None
         if not loc_uuid:
             return
 
         try:
-            loc = Location(uuid=loc_uuid)
+            loc_entity = Entity(uuid=loc_uuid)
         except KeyError:
             return
 
-        for entity_uuid in loc.contents:
-            if entity_uuid == self.uuid:
+        for entity_uuid in loc_entity.contents:
+            if self.entity and entity_uuid == self.entity.uuid:
                 continue
             try:
-                entity = Thing(uuid=entity_uuid)
+                other_entity = Entity(uuid=entity_uuid)
                 # Only greet connected entities (players)
-                if entity.connection_id:
-                    self._greet_player(entity)
+                if other_entity.connection_id:
+                    self._greet_player(other_entity)
             except (KeyError, Exception):
                 continue
 
-    def _greet_player(self, player: Thing):
+    def _greet_player(self, player: Entity):
         """Say hello to a player."""
         # Don't spam - track who we've greeted recently
         greeted = self.data.get("greeted", [])
@@ -196,13 +198,13 @@ class NPC(Location):
         behavior = self.data.get("behavior", "wanderer")
         greetings = GREETINGS.get(behavior, GREETINGS["wanderer"])
         greeting = random.choice(greetings)
-        npc_name = self.data.get("name", "someone")
+        npc_name = self.entity.name if self.entity else "someone"
 
         player.push_event(
             {
                 "type": "say",
                 "speaker": npc_name,
-                "speaker_uuid": self.uuid,
+                "speaker_uuid": self.entity.uuid if self.entity else "",
                 "message": greeting,
             }
         )
@@ -224,29 +226,13 @@ class NPC(Location):
             dict confirming reaction.
         """
         try:
-            player = Thing(uuid=player_uuid)
+            player = Entity(uuid=player_uuid)
             if player.connection_id:
                 self._greet_player(player)
         except KeyError:
             pass
-        return {"type": "npc_reaction", "npc_uuid": self.uuid}
-
-    def _broadcast_to_location(self, location_uuid: str, event: dict) -> None:
-        """Push event to all connected entities at a location, except self."""
-        if not location_uuid:
-            return
-        try:
-            loc = Location(uuid=location_uuid)
-            for entity_uuid in loc.contents:
-                if entity_uuid == self.uuid:
-                    continue
-                try:
-                    entity = Thing(uuid=entity_uuid)
-                    entity.push_event(event)
-                except (KeyError, Exception):
-                    pass
-        except (KeyError, Exception):
-            pass
+        npc_uuid = self.entity.uuid if self.entity else self.uuid
+        return {"type": "npc_reaction", "npc_uuid": npc_uuid}
 
 
-handler = lambdaHandler(NPC)
+handler = lambdaHandler(Entity)

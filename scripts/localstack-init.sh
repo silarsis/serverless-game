@@ -23,7 +23,17 @@ done
 
 echo "Creating DynamoDB tables..."
 
-# Thing Table
+# Entity Table (central table for all game objects)
+aws --endpoint-url=$LOCALSTACK_ENDPOINT dynamodb create-table \
+    --table-name entity-table-local \
+    --attribute-definitions AttributeName=uuid,AttributeType=S AttributeName=location,AttributeType=S \
+    --key-schema AttributeName=uuid,KeyType=HASH \
+    --global-secondary-indexes \
+        "IndexName=contents,KeySchema=[{AttributeName=location,KeyType=HASH},{AttributeName=uuid,KeyType=RANGE}],Projection={ProjectionType=KEYS_ONLY},ProvisionedThroughput={ReadCapacityUnits=5,WriteCapacityUnits=5}" \
+    --provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5 \
+    --region ap-southeast-1 2>/dev/null || echo "entity-table-local already exists"
+
+# Thing Table (legacy, kept for backward compatibility)
 aws --endpoint-url=$LOCALSTACK_ENDPOINT dynamodb create-table \
     --table-name thing-table-local \
     --attribute-definitions AttributeName=uuid,AttributeType=S \
@@ -69,6 +79,14 @@ aws --endpoint-url=$LOCALSTACK_ENDPOINT dynamodb create-table \
         "IndexName=by-user,KeySchema=[{AttributeName=google_uid,KeyType=HASH},{AttributeName=api_key,KeyType=RANGE}],Projection={ProjectionType=ALL},ProvisionedThroughput={ReadCapacityUnits=5,WriteCapacityUnits=5}" \
     --provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5 \
     --region ap-southeast-1 2>/dev/null || echo "api-keys-local already exists"
+
+# Suggestion Table
+aws --endpoint-url=$LOCALSTACK_ENDPOINT dynamodb create-table \
+    --table-name suggestion-table-local \
+    --attribute-definitions AttributeName=uuid,AttributeType=S \
+    --key-schema AttributeName=uuid,KeyType=HASH \
+    --provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5 \
+    --region ap-southeast-1 2>/dev/null || echo "suggestion-table-local already exists"
 
 echo "Creating SNS topic..."
 THING_TOPIC_ARN=$(aws --endpoint-url=$LOCALSTACK_ENDPOINT sns create-topic \
@@ -175,11 +193,13 @@ echo ""
 echo "Resource ARNs (for local development):"
 echo "----------------------------------------------"
 echo "DynamoDB Tables:"
+echo "  - entity-table-local"
 echo "  - thing-table-local"
 echo "  - location-table-local"
 echo "  - land-table-local"
 echo "  - users-local"
 echo "  - api-keys-local"
+echo "  - suggestion-table-local"
 echo ""
 echo "SNS Topic ARN:"
 echo "  $THING_TOPIC_ARN"

@@ -12,11 +12,13 @@ custom:
     pythonBin: python3
   defaultRegion: ap-southeast-1
   tables:
+    entityName: 'entity-table-${self:provider.stage}'
     thingName: 'thing-table-${self:provider.stage}'
     locationName: 'location-table-${self:provider.stage}'
     landName: 'land-table-${self:provider.stage}'
     usersName: 'users-${self:provider.stage}'
     apiKeysName: 'api-keys-${self:provider.stage}'
+    suggestionName: 'suggestion-${self:provider.stage}'
   topics:
     thingName: 'thing-topic-${self:provider.stage}'
   MessageDelayerName: 'message-delayer-${self:provider.stage}'
@@ -38,11 +40,13 @@ provider:
         - dynamodb:UpdateItem
         - dynamodb:DeleteItem
       Resource:
+        - { "Fn::GetAtt": ["EntityDynamoDBTable", "Arn" ] }
         - { "Fn::GetAtt": ["ThingDynamoDBTable", "Arn" ] }
         - { "Fn::GetAtt": ["LocationDynamoDBTable", "Arn" ] }
         - { "Fn::GetAtt": ["LandDynamoDBTable", "Arn" ] }
         - { "Fn::GetAtt": ["UsersDynamoDBTable", "Arn" ] }
         - { "Fn::GetAtt": ["ApiKeysDynamoDBTable", "Arn" ] }
+        - { "Fn::GetAtt": ["SuggestionDynamoDBTable", "Arn" ] }
     - Effect: Allow
       Action:
         - states:StartExecution
@@ -54,11 +58,13 @@ provider:
       Resource:
         - "arn:aws:execute-api:#{AWS::Region}:#{AWS::AccountId}:*/@connections/*"
   environment:
+    ENTITY_TABLE: ${self:custom.tables.entityName}
     THING_TABLE: ${self:custom.tables.thingName}
     LOCATION_TABLE: ${self:custom.tables.locationName}
     LAND_TABLE: ${self:custom.tables.landName}
     THING_TOPIC_ARN: !Ref ThingTopic
     MESSAGE_DELAYER_ARN: !Ref MessageDelayer
+    SUGGESTION_TABLE: ${self:custom.tables.suggestionName}
     DD_TRACE_AGENT_URL: 'https://ingest.lightstep.com:443'
     DD_TRACE_GLOBAL_TAGS: "lightstep.service_name:serverless-game,lightstep.access_token:${param:lightstep_access_token}"
 
@@ -242,6 +248,23 @@ functions:
             aspect:
               - NPC
 
+  suggestion:
+    handler: aspects/suggestion.handler
+    VpcId:
+      Ref:
+        Fn::ImportValue: VpcId
+    package:
+      exclude:
+        - ./**
+      include:
+        - aspects/**
+    events:
+      - sns:
+          arn: "arn:aws:sns:#{AWS::Region}:#{AWS::AccountId}:${self:custom.topics.thingName}"
+          filterPolicy:
+            aspect:
+              - Suggestion
+
 resources:
   Resources:
     UsersDynamoDBTable:
@@ -356,6 +379,34 @@ resources:
             }
           }
 
+    EntityDynamoDBTable:
+      Type: 'AWS::DynamoDB::Table'
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: uuid
+            AttributeType: S
+          - AttributeName: location
+            AttributeType: S
+        KeySchema:
+          - AttributeName: uuid
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: "contents"
+            KeySchema:
+              - AttributeName: location
+                KeyType: HASH
+              - AttributeName: uuid
+                KeyType: RANGE
+            Projection:
+              ProjectionType: KEYS_ONLY
+            ProvisionedThroughput:
+              ReadCapacityUnits: 1
+              WriteCapacityUnits: 1
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        TableName: ${self:custom.tables.entityName}
+
     ThingDynamoDBTable:
       Type: 'AWS::DynamoDB::Table'
       Properties:
@@ -456,6 +507,21 @@ resources:
           ReadCapacityUnits: 1
           WriteCapacityUnits: 1
         TableName: ${self:custom.tables.landName}
+
+    SuggestionDynamoDBTable:
+      Type: 'AWS::DynamoDB::Table'
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: uuid
+            AttributeType: S
+        KeySchema:
+          - AttributeName: uuid
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        TableName: ${self:custom.tables.suggestionName}
+
   Outputs:
     ThingTopic:
       Value: !Ref ThingTopic

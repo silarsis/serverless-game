@@ -50,7 +50,7 @@ def disconnect_handler(event: dict, context: dict) -> dict:
             tid=str(uuid4()),
             originator="",
             uuid=entity_info["uuid"],
-            aspect=entity_info["aspect"],
+            aspect="Entity",
             action="detach_connection",
         ).now()
 
@@ -88,7 +88,7 @@ def command_handler(event: dict, context: dict) -> dict:
         tid=str(uuid4()),
         originator=connection_id,
         uuid=entity_info["uuid"],
-        aspect=entity_info["aspect"],
+        aspect="Entity",
         action="receive_command",
         command=command,
         **data,
@@ -100,12 +100,11 @@ def command_handler(event: dict, context: dict) -> dict:
 def _handle_possess(connection_id: str, data: dict) -> dict:
     """Bind WebSocket connection to an entity."""
     entity_uuid = data.get("entity_uuid")
-    entity_aspect = data.get("entity_aspect")
 
-    if not entity_uuid or not entity_aspect:
+    if not entity_uuid:
         return {
             "statusCode": 400,
-            "body": json.dumps({"error": "possess requires entity_uuid and entity_aspect"}),
+            "body": json.dumps({"error": "possess requires entity_uuid"}),
         }
 
     # First, detach this connection from any existing entity
@@ -115,7 +114,7 @@ def _handle_possess(connection_id: str, data: dict) -> dict:
             tid=str(uuid4()),
             originator="",
             uuid=existing["uuid"],
-            aspect=existing["aspect"],
+            aspect="Entity",
             action="detach_connection",
         ).now()
 
@@ -124,7 +123,7 @@ def _handle_possess(connection_id: str, data: dict) -> dict:
         tid=str(uuid4()),
         originator=connection_id,
         uuid=entity_uuid,
-        aspect=entity_aspect,
+        aspect="Entity",
         action="attach_connection",
         connection_id=connection_id,
     ).now()
@@ -136,8 +135,8 @@ def _handle_possess(connection_id: str, data: dict) -> dict:
 
 
 def _find_entity_by_connection(connection_id: str) -> Optional[Dict]:
-    """Find entity that has this connection_id."""
-    table = get_dynamodb_table("THING_TABLE")
+    """Find entity that has this connection_id in the entity table."""
+    table = get_dynamodb_table("ENTITY_TABLE")
 
     # Scan for entity with this connection_id
     # NOTE: In production, add a GSI on connection_id for efficiency
@@ -149,5 +148,5 @@ def _find_entity_by_connection(connection_id: str) -> Optional[Dict]:
     items = response.get("Items", [])
     if items:
         item = items[0]
-        return {"uuid": item["uuid"], "aspect": item.get("aspect", "Thing")}
+        return {"uuid": item["uuid"]}
     return None

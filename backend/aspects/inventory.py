@@ -2,21 +2,29 @@
 
 Items are Things with a Location. An item's location can be either a land
 tile UUID (it's on the ground) or an entity UUID (it's in that entity's
-inventory). Uses the existing Location contents GSI to query.
+inventory). Uses the entity table's contents GSI to query.
+
+Shared fields (name, location, contents) live on Entity, not on this aspect.
+Access them via self.entity.*.
 """
 
 import logging
 
 from .decorators import player_command
 from .handler import lambdaHandler
-from .location import Location
-from .thing import Thing, callable
+from .thing import Aspect, Entity, callable
 
 logger = logging.getLogger(__name__)
 
 
-class Inventory(Location):
-    """Aspect handling item pickup, dropping, and examination."""
+class Inventory(Aspect):
+    """Aspect handling item pickup, dropping, and examination.
+
+    Stores: carry_capacity, is_item, weight, is_terrain, terrain_type,
+    item_description, tags.
+    """
+
+    _tableName = "LOCATION_TABLE"  # Items live alongside location data for now
 
     @player_command
     def take(self, item_uuid: str) -> dict:
@@ -31,33 +39,49 @@ class Inventory(Location):
         if not item_uuid:
             return {"type": "error", "message": "Take what?"}
 
-        my_location = self.location
+        my_location = self.entity.location
         if not my_location:
             return {"type": "error", "message": "You are nowhere."}
 
         # Verify the item is at our location
         try:
-            item = Inventory(uuid=item_uuid)
+            item_entity = Entity(uuid=item_uuid)
         except KeyError:
             return {"type": "error", "message": "That item doesn't exist."}
 
-        if item.location != my_location:
+        if item_entity.location != my_location:
             return {"type": "error", "message": "That item isn't here."}
 
-        # Check it's actually an item (has is_item flag)
-        if not item.data.get("is_item"):
+        # Check it's actually an item (has is_item flag, not terrain)
+        # Load the item's inventory aspect to check
+        try:
+            item_inv = item_entity.aspect("Inventory")
+        except (ValueError, KeyError):
             return {"type": "error", "message": "You can't pick that up."}
 
-        # Move item to our inventory (set location to our UUID)
-        item.location = self.uuid
-        item_name = item.data.get("name", item_uuid[:8])
+        if not item_inv.data.get("is_item"):
+            return {"type": "error", "message": "You can't pick that up."}
+
+        # Check weight capacity
+        item_weight = item_inv.data.get("weight", 1)
+        carry_capacity = self.data.get("carry_capacity", 50)
+        current_load = self._carried_weight()
+        if current_load + item_weight > carry_capacity:
+            return {
+                "type": "error",
+                "message": "That's too heavy to carry.",
+            }
+
+        # Move item to our inventory (set item entity's location to our UUID)
+        item_entity.location = self.entity.uuid
+        item_name = item_entity.name
 
         # Notify others at the location
-        self._broadcast_to_location(
+        self.entity.broadcast_to_location(
             my_location,
             {
                 "type": "take",
-                "actor": self.data.get("name", self.uuid[:8]),
+                "actor": self.entity.name,
                 "item": item_name,
             },
         )
@@ -81,29 +105,29 @@ class Inventory(Location):
         if not item_uuid:
             return {"type": "error", "message": "Drop what?"}
 
-        my_location = self.location
+        my_location = self.entity.location
         if not my_location:
             return {"type": "error", "message": "You are nowhere."}
 
         # Verify item is in our inventory
         try:
-            item = Inventory(uuid=item_uuid)
+            item_entity = Entity(uuid=item_uuid)
         except KeyError:
             return {"type": "error", "message": "That item doesn't exist."}
 
-        if item.location != self.uuid:
+        if item_entity.location != self.entity.uuid:
             return {"type": "error", "message": "You don't have that item."}
 
         # Move item to current location
-        item.location = my_location
-        item_name = item.data.get("name", item_uuid[:8])
+        item_entity.location = my_location
+        item_name = item_entity.name
 
         # Notify others at the location
-        self._broadcast_to_location(
+        self.entity.broadcast_to_location(
             my_location,
             {
                 "type": "drop",
-                "actor": self.data.get("name", self.uuid[:8]),
+                "actor": self.entity.name,
                 "item": item_name,
             },
         )
@@ -128,22 +152,33 @@ class Inventory(Location):
             return {"type": "error", "message": "Examine what?"}
 
         try:
-            item = Inventory(uuid=item_uuid)
+            item_entity = Entity(uuid=item_uuid)
         except KeyError:
             return {"type": "error", "message": "That item doesn't exist."}
 
         # Must be in our inventory or at our location
-        if item.location != self.uuid and item.location != self.location:
+        if (
+            item_entity.location != self.entity.uuid
+            and item_entity.location != self.entity.location
+        ):
             return {"type": "error", "message": "You can't see that item."}
+
+        # Load item's inventory aspect for properties
+        try:
+            item_inv = item_entity.aspect("Inventory")
+        except (ValueError, KeyError):
+            item_inv = None
+
+        item_data = item_inv.data if item_inv else {}
 
         return {
             "type": "examine",
-            "name": item.data.get("name", item_uuid[:8]),
-            "description": item.data.get("description", "Nothing special about it."),
+            "name": item_entity.name,
+            "description": item_data.get("description", "Nothing special about it."),
             "item_uuid": item_uuid,
             "properties": {
                 k: v
-                for k, v in item.data.items()
+                for k, v in item_data.items()
                 if k not in ("uuid", "exits", "location", "connection_id")
             },
         }
@@ -155,20 +190,21 @@ class Inventory(Location):
         Returns:
             dict with list of carried items.
         """
-        # Items in inventory have their location set to our UUID
-        item_uuids = self.contents  # Uses the GSI: location = self.uuid
+        # Items in inventory have their location set to our UUID in the entity table
+        item_uuids = self.entity.contents
         items = []
         for iuuid in item_uuids:
             try:
-                item = Inventory(uuid=iuuid)
-                if item.data.get("is_item"):
+                item_entity = Entity(uuid=iuuid)
+                item_inv = item_entity.aspect("Inventory")
+                if item_inv.data.get("is_item"):
                     items.append(
                         {
                             "uuid": iuuid,
-                            "name": item.data.get("name", iuuid[:8]),
+                            "name": item_entity.name,
                         }
                     )
-            except KeyError:
+            except (KeyError, ValueError):
                 continue
 
         return {
@@ -189,34 +225,40 @@ class Inventory(Location):
         Returns:
             dict with created item info.
         """
-        item = Inventory()
-        item.data["name"] = name
-        item.data["description"] = description
-        item.data["is_item"] = True
-        item.data.update(properties)
-        item.location = self.location or self.uuid
-        item._save()
+        # Create entity record
+        item_entity = Entity()
+        item_entity.data["name"] = name
+        item_entity.data["location"] = self.entity.location or self.entity.uuid
+        item_entity.data["aspects"] = ["Inventory"]
+        item_entity.data["primary_aspect"] = "Inventory"
+        item_entity._save()
+
+        # Create inventory aspect record
+        item_inv = Inventory()
+        item_inv.data["uuid"] = item_entity.uuid  # Sync UUIDs
+        item_inv.data["description"] = description
+        item_inv.data["is_item"] = True
+        item_inv.data.update(properties)
+        item_inv._save()
 
         return {
             "type": "item_created",
-            "item_uuid": item.uuid,
+            "item_uuid": item_entity.uuid,
             "name": name,
         }
 
-    def _broadcast_to_location(self, location_uuid: str, event: dict) -> None:
-        """Push an event to all connected entities at a location, except self."""
-        try:
-            loc = Location(uuid=location_uuid)
-            for entity_uuid in loc.contents:
-                if entity_uuid == self.uuid:
-                    continue
-                try:
-                    entity = Thing(uuid=entity_uuid)
-                    entity.push_event(event)
-                except (KeyError, Exception):
-                    pass
-        except (KeyError, Exception) as e:
-            logger.debug(f"Could not broadcast to location {location_uuid}: {e}")
+    def _carried_weight(self) -> int:
+        """Calculate total weight of items in inventory."""
+        total = 0
+        for iuuid in self.entity.contents:
+            try:
+                item_entity = Entity(uuid=iuuid)
+                item_inv = item_entity.aspect("Inventory")
+                if item_inv.data.get("is_item"):
+                    total += item_inv.data.get("weight", 1)
+            except (KeyError, ValueError):
+                continue
+        return total
 
 
-handler = lambdaHandler(Inventory)
+handler = lambdaHandler(Entity)

@@ -1,4 +1,8 @@
-"""Tests for Land aspect module."""
+"""Tests for Land aspect module.
+
+Land inherits from Location (Aspect subclass) and adds grid-based features.
+Shared fields live on Entity. Land aspect table has a cartesian GSI.
+"""
 
 import unittest
 from os import environ
@@ -7,8 +11,11 @@ import boto3
 from moto import mock_aws
 
 from aspects.land import Land
+from aspects.thing import Entity
 
+environ["ENTITY_TABLE"] = "test-entity-table"
 environ["LAND_TABLE"] = "test_land_table"
+environ["LOCATION_TABLE"] = "test_location_table"
 environ["AWS_DEFAULT_REGION"] = "ap-southeast-1"
 
 
@@ -19,25 +26,42 @@ class TestLand(unittest.TestCase):
         """Set up mocked DynamoDB resources for testing."""
         self.mock = mock_aws()
         self.mock.start()
-        boto3.resource(
-            "dynamodb"
-        ).create_table(  # TODO: Can we extract this from yaml and generate it?
+        db = boto3.resource("dynamodb")
+
+        # Entity table with contents GSI
+        db.create_table(
+            TableName=environ["ENTITY_TABLE"],
+            KeySchema=[{"AttributeName": "uuid", "KeyType": "HASH"}],
             AttributeDefinitions=[
                 {"AttributeName": "uuid", "AttributeType": "S"},
-                {"AttributeName": "Land", "AttributeType": "S"},
-                {"AttributeName": "coordinates", "AttributeType": "S"},
+                {"AttributeName": "location", "AttributeType": "S"},
             ],
-            TableName=environ["LAND_TABLE"],
-            KeySchema=[{"AttributeName": "uuid", "KeyType": "HASH"}],
             GlobalSecondaryIndexes=[
                 {
                     "IndexName": "contents",
                     "KeySchema": [
-                        {"AttributeName": "Land", "KeyType": "HASH"},
+                        {"AttributeName": "location", "KeyType": "HASH"},
                         {"AttributeName": "uuid", "KeyType": "RANGE"},
                     ],
                     "Projection": {"ProjectionType": "KEYS_ONLY"},
-                },
+                    "ProvisionedThroughput": {
+                        "ReadCapacityUnits": 5,
+                        "WriteCapacityUnits": 5,
+                    },
+                }
+            ],
+            ProvisionedThroughput={"ReadCapacityUnits": 5, "WriteCapacityUnits": 5},
+        )
+
+        # Land aspect table with cartesian GSI
+        db.create_table(
+            TableName=environ["LAND_TABLE"],
+            KeySchema=[{"AttributeName": "uuid", "KeyType": "HASH"}],
+            AttributeDefinitions=[
+                {"AttributeName": "uuid", "AttributeType": "S"},
+                {"AttributeName": "coordinates", "AttributeType": "S"},
+            ],
+            GlobalSecondaryIndexes=[
                 {
                     "IndexName": "cartesian",
                     "KeySchema": [
@@ -45,9 +69,23 @@ class TestLand(unittest.TestCase):
                         {"AttributeName": "uuid", "KeyType": "RANGE"},
                     ],
                     "Projection": {"ProjectionType": "KEYS_ONLY"},
+                    "ProvisionedThroughput": {
+                        "ReadCapacityUnits": 5,
+                        "WriteCapacityUnits": 5,
+                    },
                 },
             ],
-            ProvisionedThroughput={"ReadCapacityUnits": 1, "WriteCapacityUnits": 1},
+            ProvisionedThroughput={"ReadCapacityUnits": 5, "WriteCapacityUnits": 5},
+        )
+
+        # Location aspect table (for Location base class if needed)
+        db.create_table(
+            TableName=environ["LOCATION_TABLE"],
+            KeySchema=[{"AttributeName": "uuid", "KeyType": "HASH"}],
+            AttributeDefinitions=[
+                {"AttributeName": "uuid", "AttributeType": "S"},
+            ],
+            ProvisionedThroughput={"ReadCapacityUnits": 5, "WriteCapacityUnits": 5},
         )
 
     def tearDown(self):
@@ -55,17 +93,19 @@ class TestLand(unittest.TestCase):
         self.mock.stop()
 
     def test_init(self):
-        """Test initialization of Land object."""
+        """Test initialization of Land aspect."""
         loc = Land()
+        loc._save()
         self.assertEqual(Land(uuid=loc.uuid).uuid, loc.uuid)
 
     def test_add_exits(self):
-        """Test adding exits to a Land object."""
+        """Test adding exits to a Land aspect."""
         loc = Land()
         loc.coordinates = (0, 0, 0)
         north_loc = Land()
         north_loc.coordinates = (0, 1, 0)
         south_loc = Land()
+        south_loc._save()
         self.assertEqual(loc.exits, {})
         loc.add_exit("north", north_loc.uuid)
         self.assertEqual(
@@ -89,7 +129,7 @@ class TestLand(unittest.TestCase):
         )
 
     def test_remove_exits(self):
-        """Test removing exits from a Land object."""
+        """Test removing exits from a Land aspect."""
         loc = Land()
         loc.coordinates = (0, 0, 0)
         self.assertEqual(loc.exits, {})
@@ -115,6 +155,14 @@ class TestLand(unittest.TestCase):
         loc_uuid = Land.by_coordinates((0, 0, 0))
         new_loc_uuid = Land.by_coordinates((0, 0, 0))
         self.assertEqual(loc_uuid, new_loc_uuid)
+
+    def test_by_coordinates_creates_entity(self):
+        """Test that by_coordinates also creates an Entity record."""
+        loc_uuid = Land.by_coordinates((0, 0, 0))
+        # Should be able to load the entity
+        entity = Entity(uuid=loc_uuid)
+        self.assertEqual(entity.data["aspects"], ["Land"])
+        self.assertEqual(entity.data["primary_aspect"], "Land")
 
     def test_post_linkage(self):
         """Test that after linkage, exit points to the computed location."""
