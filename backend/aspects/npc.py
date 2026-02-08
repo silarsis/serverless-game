@@ -57,7 +57,7 @@ class NPC(Aspect):
     Stores: behavior, patrol_route, patrol_index, greeted, is_npc.
     """
 
-    _tableName = "LOCATION_TABLE"  # Share table for now
+    _tableName = "LOCATION_TABLE"  # Shared aspect table — keyed by entity UUID, no conflicts
 
     @callable
     def create(self, behavior: str = "wander", name: str = "a stranger", **kwargs):

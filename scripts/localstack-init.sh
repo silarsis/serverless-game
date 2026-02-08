@@ -26,10 +26,11 @@ echo "Creating DynamoDB tables..."
 # Entity Table (central table for all game objects)
 aws --endpoint-url=$LOCALSTACK_ENDPOINT dynamodb create-table \
     --table-name entity-table-local \
-    --attribute-definitions AttributeName=uuid,AttributeType=S AttributeName=location,AttributeType=S \
+    --attribute-definitions AttributeName=uuid,AttributeType=S AttributeName=location,AttributeType=S AttributeName=connection_id,AttributeType=S \
     --key-schema AttributeName=uuid,KeyType=HASH \
     --global-secondary-indexes \
         "IndexName=contents,KeySchema=[{AttributeName=location,KeyType=HASH},{AttributeName=uuid,KeyType=RANGE}],Projection={ProjectionType=KEYS_ONLY},ProvisionedThroughput={ReadCapacityUnits=5,WriteCapacityUnits=5}" \
+        "IndexName=by_connection,KeySchema=[{AttributeName=connection_id,KeyType=HASH}],Projection={ProjectionType=KEYS_ONLY},ProvisionedThroughput={ReadCapacityUnits=5,WriteCapacityUnits=5}" \
     --provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5 \
     --region ap-southeast-1 2>/dev/null || echo "entity-table-local already exists"
 

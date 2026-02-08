@@ -24,7 +24,7 @@ class Inventory(Aspect):
     item_description, tags.
     """
 
-    _tableName = "LOCATION_TABLE"  # Items live alongside location data for now
+    _tableName = "LOCATION_TABLE"  # Shared aspect table — keyed by entity UUID, no conflicts
 
     @player_command
     def take(self, item_uuid: str) -> dict:

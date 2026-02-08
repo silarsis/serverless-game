@@ -529,18 +529,19 @@ async def _handle_ws_command(ws, connection_id, command, data, claims):
 
 
 def _find_entity_by_connection(connection_id: str) -> str:
-    """Find entity UUID with this connection_id by scanning the entity table."""
+    """Find entity UUID with this connection_id via by_connection GSI."""
     try:
         table = get_dynamodb_table("ENTITY_TABLE")
-        response = table.scan(
-            FilterExpression="connection_id = :cid",
+        response = table.query(
+            IndexName="by_connection",
+            KeyConditionExpression="connection_id = :cid",
             ExpressionAttributeValues={":cid": connection_id},
         )
         items = response.get("Items", [])
         if items:
             return items[0]["uuid"]
     except Exception as e:
-        logger.debug(f"Error scanning entity table for connection: {e}")
+        logger.debug(f"Error querying entity table for connection: {e}")
     return None
 
 
@@ -548,8 +549,9 @@ def _detach_connection(connection_id: str):
     """Clear connection_id from any entity that has it."""
     try:
         table = get_dynamodb_table("ENTITY_TABLE")
-        response = table.scan(
-            FilterExpression="connection_id = :cid",
+        response = table.query(
+            IndexName="by_connection",
+            KeyConditionExpression="connection_id = :cid",
             ExpressionAttributeValues={":cid": connection_id},
         )
         for item in response.get("Items", []):

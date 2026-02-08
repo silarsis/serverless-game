@@ -25,7 +25,7 @@ class Suggestion(Aspect):
     The Suggestion aspect itself has no persistent per-entity data.
     """
 
-    _tableName = "LOCATION_TABLE"  # Aspect record table (minimal)
+    _tableName = "LOCATION_TABLE"  # Shared aspect table — keyed by entity UUID, no conflicts
 
     @player_command
     def suggest(self, text: str) -> dict:
