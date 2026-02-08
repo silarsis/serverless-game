@@ -135,18 +135,16 @@ def _handle_possess(connection_id: str, data: dict) -> dict:
 
 
 def _find_entity_by_connection(connection_id: str) -> Optional[Dict]:
-    """Find entity that has this connection_id in the entity table."""
+    """Find entity that has this connection_id via by_connection GSI."""
     table = get_dynamodb_table("ENTITY_TABLE")
 
-    # Scan for entity with this connection_id
-    # NOTE: In production, add a GSI on connection_id for efficiency
-    response = table.scan(
-        FilterExpression="connection_id = :cid",
+    response = table.query(
+        IndexName="by_connection",
+        KeyConditionExpression="connection_id = :cid",
         ExpressionAttributeValues={":cid": connection_id},
     )
 
     items = response.get("Items", [])
     if items:
-        item = items[0]
-        return {"uuid": item["uuid"]}
+        return {"uuid": items[0]["uuid"]}
     return None

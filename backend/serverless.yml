@@ -387,6 +387,8 @@ resources:
             AttributeType: S
           - AttributeName: location
             AttributeType: S
+          - AttributeName: connection_id
+            AttributeType: S
         KeySchema:
           - AttributeName: uuid
             KeyType: HASH
@@ -397,6 +399,15 @@ resources:
                 KeyType: HASH
               - AttributeName: uuid
                 KeyType: RANGE
+            Projection:
+              ProjectionType: KEYS_ONLY
+            ProvisionedThroughput:
+              ReadCapacityUnits: 1
+              WriteCapacityUnits: 1
+          - IndexName: "by_connection"
+            KeySchema:
+              - AttributeName: connection_id
+                KeyType: HASH
             Projection:
               ProjectionType: KEYS_ONLY
             ProvisionedThroughput:

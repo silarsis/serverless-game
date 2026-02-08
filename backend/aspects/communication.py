@@ -23,7 +23,7 @@ class Communication(Aspect):
     record may be empty apart from the uuid key.
     """
 
-    _tableName = "LOCATION_TABLE"  # Share table with Location for now
+    _tableName = "LOCATION_TABLE"  # Shared aspect table — keyed by entity UUID, no conflicts
 
     @player_command
     def say(self, message: str) -> dict:
