@@ -1,5 +1,33 @@
 # Combat Aspect
 
+## What This Brings to the World
+
+Combat is the gravity well of a game like this. Without it, you have a walking simulator with an inventory system -- pleasant but inert. Adding combat gives entities a reason to exist in adversarial relationships, gives players a reason to care about the items they carry, and gives the world stakes. When a goblin blocks a cave entrance, the player has to make a decision. That decision -- fight, flee, or find another way -- is the seed of emergent gameplay.
+
+For this architecture specifically, combat is a natural fit in some ways and a dangerous one in others. The aspect-oriented model means you can slap Combat onto any entity and it becomes fightable, which is elegant. A door could have hit points. A tree could fight back. The broadcast_to_location mechanism maps well to combat narration -- everyone in the room sees the fight play out. And the SNS event model means death can trigger cascading effects (loot drops, respawns, quest updates) without Combat knowing about those systems.
+
+The danger is that combat is the single highest-write-frequency system in the game. Every attack touches at minimum two entities and two aspect records. In a busy room with 5 players fighting 3 NPCs, the write contention on DynamoDB items will be intense. Combat is the system most likely to expose the cracks in a 1 WCU provisioned table, and the system most likely to produce corrupted state from concurrent last-write-wins overwrites. It belongs in this game, but it will be the first thing that breaks at scale.
+
+## Critical Analysis
+
+**The _on_death underscore problem is a showstopper.** The `_on_death` method is decorated with `@callable`, meaning it is intended to be invoked via SNS dispatch. However, `Entity._action()` explicitly rejects methods that start with an underscore as a security measure to prevent players from calling internal methods. This means `_on_death` will never actually fire when called via `Call(...).after()`, because the SNS handler will route through `_action()` and reject it. The respawn system as written is dead code. Either rename it to `on_death` (and accept that players could theoretically invoke it directly) or add a bypass for system-originated calls.
+
+**Two-player-attack race condition will corrupt HP.** When two players attack the same target simultaneously, both Lambda invocations read the target's Combat aspect, both compute `hp -= damage`, and both call `_save()` which does a full `put_item`. The second write overwrites the first. If the goblin has 20 HP and Player A deals 5 and Player B deals 8, the goblin should have 7 HP. Instead it will have either 15 or 12, depending on which Lambda finishes last. There are no DynamoDB transactions or conditional writes anywhere in the codebase. This is not an edge case -- it is the primary use case for combat.
+
+**Death loot drop is an O(N*M) broadcast bomb.** When an entity dies, `_on_death` iterates every item in inventory and sets each item's location to the current room. Each location change is a separate entity write. Worse, if any of these item drops trigger broadcasts (e.g., "a sword clatters to the ground"), each broadcast requires 1 GSI query + M get_items + M API Gateway posts for M entities at the location. For an entity carrying 20 items in a room with 10 observers, that is 20 entity writes + 20 * (1 + 10 + 10) = 420 DynamoDB operations + 200 API Gateway posts. On a 1 WCU table, this will throttle for minutes.
+
+**Respawn via Call.after(seconds=30) costs Step Functions money.** Each death creates one Step Functions execution with 30 state transitions (one per second of wait). At $0.000025 per transition, that is $0.00075 per death. If hostile NPCs respawn too and the world has 100 hostile NPCs dying and respawning in a cycle, that is 100 * $0.00075 * 2 (player + NPC deaths) every cycle. More critically, on the local development server, `Call.after()` executes immediately with no delay, so respawn timing is completely untestable locally. A 30-second respawn and a 300-second respawn behave identically in dev.
+
+**XP scaling is linear and too easy.** The formula `level * 100` XP to level up means level 1 needs 100 XP, level 10 needs 1000 XP, level 20 needs 2000 XP. Since XP gain is `target.level * 10`, killing a level 10 creature gives 100 XP. A level 19 player needs 1900 XP to reach 20, which means killing 19 level-10 creatures. Quadratic or exponential scaling (e.g., `level^2 * 50`) would create a more meaningful progression curve. As-is, a player can max out combat level in a single play session.
+
+**Status effect ticks have no scheduling mechanism for players.** `Combat.tick()` processes status effects like poison, but `tick()` is only called by the NPC aspect's tick loop. Players do not have NPC aspects, so player status effects will never tick. A player poisoned by a snake will stay poisoned forever (or until they die from some other cause). The design needs either a dedicated Combat tick scheduler for players or a time-based calculation that resolves poison damage on the next player action.
+
+**Hostile NPC targeting is first-come, ignore-the-rest.** The `_seek_and_attack` method iterates `loc_entity.contents` and attacks the first entity with a `connection_id` (i.e., the first player), then returns. If five players are in a room with a hostile dragon, the dragon attacks whichever player happens to be first in the contents list every single tick. There is no aggro table, no threat tracking, no target-switching. The other four players can attack with impunity. This makes group combat trivially exploitable.
+
+**Dependency chain.** Combat depends on Inventory (loot drops), Communication (broadcasts), Land (location checks), and optionally Equipment (stat bonuses). It must be implemented after Inventory and Land. The NPC integration means NPC aspect must also exist. This is a mid-tier dependency position -- not the worst, but not standalone either.
+
+**No damage log or combat history.** The design tracks `last_attacker` but not a history of damage dealt or received. For debugging race conditions or auditing combat exploits, there is no record of what happened. The only trace is the ephemeral broadcast messages sent to connected players.
+
 ## Overview
 
 The Combat aspect adds hit points, attack, defense, and damage mechanics to any entity. Entities with Combat can attack each other, take damage, and die. Death triggers respawn at origin (0,0,0) and inventory drop. Combat integrates with existing Inventory (loot drops), Communication (combat narration), NPC (guard behavior, hostile creatures), and Land (location-based encounters).
