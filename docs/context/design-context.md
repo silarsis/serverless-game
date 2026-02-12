@@ -257,14 +257,14 @@ Always routed through SNS to preserve the event architecture. Never direct Lambd
 ### Immediate (Next Session)
 - [x] ~~Email/Password Auth~~ — **DEPRECATED: Using Firebase Auth instead**
   - Historical designs: docs/AUTH_DESIGN.md, docs/EMAIL_DESIGN.md
-- [ ] **Firebase Authentication** — Google Sign-In (no passwords)
-  - See docs/FIREBASE_AUTH_DESIGN.md for technical details
-  - Create Firebase project, enable Google Sign-In
-  - Create `users` DynamoDB table (firebase_uid PK, entity assignment)
-  - Implement `/api/auth/login` — verify Firebase ID token, get/create user, issue internal JWT
+- [ ] **Google OAuth 2.0** — Google Sign-In (no passwords, no Firebase)
+  - See `docs/design/decisions/oauth.md` for technical details
+  - Create Google Cloud project, configure OAuth consent screen
+  - Create `users` DynamoDB table (google_id PK, entity assignment)
+  - Implement `/api/auth/login` — verify Google ID token, get/create user, issue internal JWT
   - Auto-create Player entity at (0,0,0) on first sign-in
   - WebSocket auth with internal JWT → auto-possess entity
-  - Frontend React app with Firebase client SDK
+  - Frontend React app with Google Sign-In button (react-oauth/google or direct flow)
 - [ ] Test WebSocket end-to-end with real client
 - [ ] Add keepalive/ping to prevent 2-hour timeout
 

@@ -43,7 +43,7 @@ interface for agents working on this codebase.
 - `context/glossary.md` - Domain terminology
 
 ### 🚀 Operations
-- `operations/deployment.md` - Firebase/AWS deployment
+- `operations/deployment.md` - AWS deployment guide
 - `operations/local-dev.md` - Local development setup
 
 ## Key Principles (from core-beliefs.md)
@@ -82,7 +82,7 @@ serverless-game/
 |------|--------|-------|
 | Core aspects | Working | Location, Land implemented |
 | WebSocket system | Complete | Docs in architecture/ |
-| Auth system | Partial | Firebase auth designed |
+| Auth system | Partial | Google OAuth designed, not implemented |
 | 21 Features | Designed | All have design docs, varying implementation |
 
 See `quality/assessment.md` for detailed status.

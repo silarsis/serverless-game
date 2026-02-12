@@ -1,67 +1,75 @@
-# Firebase Auth — Manual Setup (Kevin, 5 mins)
+# Google OAuth 2.0 — Manual Setup (Kevin, 15 mins)
 
 **Do this once. I'll handle all the code.**
 
 ---
 
-## Step 1: Create Firebase Project (2 mins)
+## Step 1: Create Google Cloud Project (3 mins)
 
-1. Go to **https://console.firebase.google.com**
-2. Click **"Add project"**
-3. Choose: **"serverless-game"** (or create new Google Cloud project)
-4. Enable Analytics: **No** (we don't need it)
-5. Wait for project creation (~30 seconds)
-
----
-
-## Step 2: Enable Google Sign-In (1 min)
-
-1. In Firebase Console sidebar → **Authentication** → **Get started**
-2. Click **Sign-in method** tab
-3. Click **Google** → **Enable**
-4. Set **Support email**: your email (kevin@littlejohn.id.au)
-5. Click **Save**
+1. Go to **https://console.cloud.google.com**
+2. Click project dropdown (top bar) → **New Project**
+3. Project name: `serverless-game`
+4. Choose organization (if you have one) or leave as "No organization"
+5. Select billing account (required for OAuth)
+6. Click **Create**
+7. Wait for project creation (~30 seconds), then select it
 
 ---
 
-## Step 3: Get Frontend Config (1 min)
+## Step 2: Configure OAuth Consent Screen (5 mins)
 
-1. Click ⚙️ **Project settings** (gear icon, top left)
-2. Under **Your apps** → click **</>** (web icon)
-3. **Register app**:
-   - Nickname: `serverless-game-web`
-   - Check **"Also set up Firebase Hosting"** → **NO** (we don't need it)
-   - Click **Register app**
-4. Copy this config block (looks like):
-   ```javascript
-   const firebaseConfig = {
-     apiKey: "AIza...",
-     authDomain: "serverless-game.firebaseapp.com",
-     projectId: "serverless-game",
-     storageBucket: "...",
-     messagingSenderId: "...",
-     appId: "..."
-   };
-   ```
-5. **Paste it to me** (Discord DM or here)
+1. Left sidebar → **APIs & Services** → **OAuth consent screen**
+2. Choose **External** (allows any Google user to sign in)
+   - If you only want Workspace users: choose **Internal**
+3. Click **Create**
+4. Fill in app information:
+   - **App name**: `Serverless Game`
+   - **User support email**: your email (kevin@littlejohn.id.au)
+   - **Developer contact email**: your email
+5. Click **Save and Continue**
+6. On **Scopes** page → click **Add or Remove Scopes**
+   - Select: `openid`, `email`, `profile`
+   - Click **Update** → **Save and Continue**
+7. On **Test users** page (optional for now) → **Save and Continue**
+8. Click **Back to Dashboard**
+
+**If External:** You'll need to submit for verification later (1-3 days) to remove "unverified app" warning.
 
 ---
 
-## Step 4: Get Backend Service Account (1 min)
+## Step 3: Create OAuth 2.0 Credentials (3 mins)
 
-1. Still in **Project settings** → **Service accounts** tab
-2. Click **"Generate new private key"**
-3. Click **Generate key**
-4. JSON file downloads (name like `serverless-game-abc123.json`)
-5. **Send it to me securely** (Discord DM attachment, 1Password, or paste contents)
+1. Left sidebar → **APIs & Services** → **Credentials**
+2. Click **Create Credentials** → **OAuth client ID**
+3. Application type: **Web application**
+4. Name: `serverless-game-web`
+5. **Authorized redirect URIs** (add both):
+   - `http://localhost:3000/auth/callback` (local development)
+   - `https://game.example.com/auth/callback` (production - update with your domain)
+6. Click **Create**
+7. **Copy the Client ID and Client Secret** (or download JSON)
+8. **Send them to me securely** (Discord DM or 1Password)
+
+---
+
+## Step 4: (Optional) Submit for Verification
+
+If you chose **External** in Step 2 and want to remove the "unverified app" warning:
+
+1. Go back to **OAuth consent screen**
+2. Click **Publish App** (or **Submit for verification**)
+3. Fill out verification form (may require privacy policy URL, demo video)
+4. Wait 1-3 days for Google review
+
+**For testing:** You can use the app immediately with test users added in Step 2.
 
 ---
 
 ## Done! I'll Handle:
 
-✅ Backend Lambda (`/api/auth/login`)  
-✅ DynamoDB `users` table  
-✅ React sign-in component  
+✅ Backend Lambda (`/api/auth/login`) — verify Google tokens  
+✅ DynamoDB `users` table (google_id as primary key)  
+✅ React sign-in component (Google Sign-In button)  
 ✅ WebSocket auth integration  
 ✅ Auto-create Player entity at (0,0,0)
 
@@ -78,6 +86,11 @@ You'll be able to:
 
 ---
 
-**Time estimate**: Your part = 5 minutes. My part = 1-2 hours.
+## What I Need From You
 
-**Blockers?** If any step fails, tell me where and I'll help.
+Send me securely (Discord DM or 1Password):
+- **Client ID** (looks like: `123-abc.apps.googleusercontent.com`)
+- **Client Secret** (random string)
+- **Your authorized domain** (for production redirect URI)
+
+That's it! No service account JSON needed for OAuth 2.0.

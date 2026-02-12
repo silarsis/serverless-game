@@ -156,7 +156,7 @@ backend/
 See `../design/decisions/` for architecture decision records:
 - Aspect-oriented vs OOP (`aspect-oriented.md`)
 - WebSocket architecture (`websocket-design.md`)
-- Auth system (`auth-system.md`, `firebase-auth.md`)
+- Auth system (`auth-system.md`, `oauth.md`)
 - Serverless infrastructure (`serverless-infra.md`)
 
 ## Quality Assessment
