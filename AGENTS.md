@@ -1,6 +1,8 @@
 # AGENTS.md - Serverless Game Repository Guide
 
-> **STRUCTURE NOTE FOR CLAUDE:** This repository follows the OpenAI harness engineering pattern.
+> **For AI agents:** See `CLAUDE.md` for detailed agent maintenance guidance.
+> 
+> This repository follows the OpenAI harness engineering pattern.
 > AGENTS.md is a MAP (not an encyclopedia). Detailed knowledge lives in `docs/`.
 > When working, start here for orientation, then navigate to specific docs/ sections.
 
