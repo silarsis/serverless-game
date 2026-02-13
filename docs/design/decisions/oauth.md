@@ -1,7 +1,9 @@
-# Google OAuth Setup Investigation — serverless-game
+# Google OAuth 2.0 Setup — serverless-game
 
 ## Summary
-This document covers the process and feasibility of setting up Google OAuth as an alternative authentication method (vs. email/password) for `serverless-game`. It details what can be automated, what requires manual browser steps, and recommends the best approach for swift and reliable implementation.
+This document is the **primary authentication design** for `serverless-game`. We use direct Google OAuth 2.0 with Google Sign-In (no Firebase middleware). It details the setup process, automation limits, and implementation approach.
+
+**Status:** ✅ Active design (replaces Firebase Auth approach)
 
 ---
 
@@ -33,14 +35,6 @@ This document covers the process and feasibility of setting up Google OAuth as a
 
 - **Manual Action:** Web browser required to create and configure OAuth client for most app scenarios.
 
-## 5. Alternative: Firebase Auth
-- **Easier Approach:** Firebase Authentication provides a streamlined way to add Google Sign-In (and other auth methods) to web apps [Docs](https://firebase.google.com/docs/auth/web/google-signin).
-- **Setup:**
-    - Project must be created in [Firebase Console](https://console.firebase.google.com)
-    - Google Sign-in can be enabled with very little configuration (select from UI, no need to create OAuth credentials manually for most use cases)
-    - Provides client SDK for integration
-- **Automation:** No programmatic project creation for Auth, but far less manual config for OAuth flows vs raw GCP. Once Firebase is set up, the rest is all code.
-
 ---
 
 ## Steps That CAN Be Automated
@@ -50,15 +44,8 @@ This document covers the process and feasibility of setting up Google OAuth as a
 
 ## Steps That REQUIRE Manual Browser Interaction
 - Setting OAuth Consent Screen to "public" (required for any user, not just G Suite/Workspace)
-- Creating regular OAuth credentials with custom redirect URIs for a general web app
+- Creating OAuth credentials with custom redirect URIs
 - Downloading client secrets from the console
-- Enabling Google Sign-In in Firebase Console (but very fast — just a few clicks)
-
----
-
-## Recommended Approach
-- **Firebase Auth** is *strongly* recommended for new user-facing projects — fewer manual steps, instant (painless) Google Sign-In, clear documentation, much less scope/data review friction. Only need the Firebase Console for a few minutes during setup.
-- **Classic Google OAuth via Cloud Console** is only needed if you require fine-grained control or use outside Google/Firebase ecosystem (slower, more manual config, more review required for public OAuth consent).
 
 ---
 
@@ -86,12 +73,13 @@ This document covers the process and feasibility of setting up Google OAuth as a
 ---
 
 ## Time Estimates
-- **Firebase Auth**: 5-15 minutes (once logged in)
-- **Classic Google OAuth**: 15-45 minutes (+ extra days if public verification required)
+- **Initial Google Cloud setup**: 15-45 minutes (+ 1-3 days if public OAuth verification required)
+- **Ongoing**: No Firebase-specific overhead, direct token verification
 
 ---
 
 ## Conclusion
-- **Automation ceiling:** Cloud APIs allow some scaffolding, but public OAuth setup for web users always requires browser-based steps due to Google’s verification and security requirements.
-- **Recommended for most:** Use Firebase Auth unless you need raw OAuth for cross-platform or non-Firebase needs.
-- **If you want help performing the manual steps:** see above checklist and let me know when you have provided credentials.
+- **Why direct OAuth:** We eliminated the Firebase abstraction layer for full control over token handling, reduced dependencies, and simpler mental model.
+- **Automation ceiling:** Cloud APIs allow some scaffolding, but public OAuth setup for web users always requires browser-based steps due to Google's verification requirements.
+- **Current approach:** Direct Google OAuth 2.0 as documented in `requirements.md`.
+- **Deprecated:** Firebase Auth approach (see `archive/firebase-auth.md` for historical reference).
