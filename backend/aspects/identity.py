@@ -362,8 +362,8 @@ class Identity(Aspect):
             display = f"{display_name} {title}"
         
         # Format timestamps
-        created_str = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(created_at)) if created_at else "Not set"
-        updated_str = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(updated_at)) if updated_at else "Never"
+        created_str = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(int(created_at) if created_at else 0)) if created_at else "Not set"
+        updated_str = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(int(updated_at) if updated_at else 0)) if updated_at else "Never"
         
         # Build output
         lines = [f"=== Your Profile: {display} ==="]

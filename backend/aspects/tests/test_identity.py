@@ -295,6 +295,7 @@ class TestIdentity(unittest.TestCase):
         self.assertEqual(result["name"], "OtherPlayer")
 
     def test_inspect_target_with_identity(self):
+        from aspects.thing import Entity
         """Test inspecting entity with full Identity."""
         from aspects.identity import Identity
 
