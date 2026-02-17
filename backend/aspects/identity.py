@@ -406,8 +406,8 @@ class Identity(Aspect):
             "attributes": attributes,
             "equipment_summary": equipment_summary,
             "name_changes": len(name_history),
-            "created_at": created_at,
-            "updated_at": updated_at,
+            "created_at": int(created_at) if created_at else 0,
+            "updated_at": int(updated_at) if updated_at else 0,
             "message": "\n".join(lines),
         }
     

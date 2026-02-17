@@ -57,7 +57,7 @@ from aspects.thing import Call, Entity
 
 # Try to import optional aspects
 try:
-    from aspects import communication, inventory, npc
+    from aspects import communication, inventory, npc, identity
 except ImportError as e:
     logger.warning(f"Optional aspect import failed (comms/inv/npc): {e}")
     communication = inventory = npc = None
@@ -232,6 +232,13 @@ def get_or_create_player_entity(user_id: str, name: str = "Player") -> dict:
     try:
         entity = Entity(uuid=entity_uuid)
         logger.info(f"Found existing player entity {entity_uuid}")
+        
+        # Ensure Identity aspect is present for Feature 21
+        aspects = entity.data.get("aspects", [])
+        if "Identity" not in aspects:
+            entity.data["aspects"] = aspects + ["Identity"]
+            entity._save()
+
         return {"uuid": entity_uuid}
     except (KeyError, Exception):
         pass
@@ -247,7 +254,7 @@ def get_or_create_player_entity(user_id: str, name: str = "Player") -> dict:
             "uuid": entity_uuid,
             "name": name,
             "location": origin_uuid,
-            "aspects": ["Land", "Inventory", "Communication", "Suggestion"],
+            "aspects": ["Land", "Inventory", "Communication", "Suggestion", "Identity"],
             "primary_aspect": "Land",
         }
     )
