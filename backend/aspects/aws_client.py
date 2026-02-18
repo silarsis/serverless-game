@@ -11,7 +11,7 @@ Environment Variables:
 """
 
 import os
-from typing import Optional
+from typing import Any, Dict, List, Optional
 
 import boto3
 
@@ -122,3 +122,76 @@ def get_api_gateway_client():
         )
 
     raise ValueError("WEBSOCKET_API_ENDPOINT environment variable not set")
+
+
+def get_dynamodb_client():
+    """Get DynamoDB client configured for current environment."""
+    endpoint = get_localstack_endpoint()
+    if endpoint:
+        return boto3.client(
+            "dynamodb",
+            endpoint_url=endpoint,
+            region_name=os.environ.get("AWS_DEFAULT_REGION", "ap-southeast-1"),
+            aws_access_key_id=os.environ.get("AWS_ACCESS_KEY_ID", "test"),
+            aws_secret_access_key=os.environ.get("AWS_SECRET_ACCESS_KEY", "test"),
+        )
+    return boto3.client("dynamodb")
+
+
+def dynamodb_batch_get_by_uuid(table_env: str, uuids: List[str]) -> List[Dict[str, Any]]:
+    """Batch fetch items by UUID from a DynamoDB table.
+
+    Uses DynamoDB BatchGetItem to fetch multiple items in a single request,
+    avoiding N+1 read patterns when accessing multiple entities.
+
+    Args:
+        table_env: Environment variable name holding the table name
+        uuids: List of UUIDs to fetch
+
+    Returns:
+        List of item dictionaries (empty if no valid uuids provided)
+    """
+    if not uuids:
+        return []
+
+    table_name = os.environ.get(table_env)
+    if not table_name:
+        raise ValueError(f"Environment variable {table_env} is not set")
+
+    unique_uuids = list({str(u) for u in uuids if u})
+
+    if not unique_uuids:
+        return []
+
+    client = get_dynamodb_client()
+
+    # Build the batch_get request (max 100 items per request)
+    results = []
+    for i in range(0, len(unique_uuids), 100):
+        batch = unique_uuids[i : i + 100]
+        keys = [{"uuid": {"S": uuid}} for uuid in batch]
+
+        response = client.batch_get_item(RequestItems={table_name: {"Keys": keys}})
+
+        items = response.get("Responses", {}).get(table_name, [])
+        for item in items:
+            # Convert DynamoDB format to plain dict
+            plain: Dict[str, Any] = {}
+            for k, v in item.items():
+                if "S" in v:
+                    plain[k] = v["S"]
+                elif "N" in v:
+                    plain[k] = int(v["N"]) if "." not in v["N"] else float(v["N"])
+                elif "BOOL" in v:
+                    plain[k] = v["BOOL"]
+                elif "NULL" in v:
+                    plain[k] = None
+                elif "L" in v:
+                    plain[k] = v["L"]
+                elif "M" in v:
+                    plain[k] = v["M"]
+                else:
+                    plain[k] = v
+            results.append(plain)
+
+    return results
