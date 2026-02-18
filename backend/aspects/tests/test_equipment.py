@@ -260,17 +260,17 @@ class TestEquipment(unittest.TestCase):
 
         # Equip multiple items with various bonuses
         _, weapon = self._make_equippable_item(
-            name="Sword", location=player_entity.uuid, slot="held_main", attack_bonus=10
+            name="Sword", location=player_entity.uuid, slot="held_main", attack_bonus=10, defense_bonus=0, magic_bonus=0, hp_bonus=0
         )
         eq.equip(item_uuid=weapon.uuid)
 
         _, armor = self._make_equippable_item(
-            name="Plate", location=player_entity.uuid, slot="body", defense_bonus=15
+            name="Plate", location=player_entity.uuid, slot="body", defense_bonus=15, attack_bonus=0, magic_bonus=0, hp_bonus=0
         )
         eq.equip(item_uuid=armor.uuid)
 
         _, ring = self._make_equippable_item(
-            name="Ring", location=player_entity.uuid, slot="accessory", magic_bonus=5, hp_bonus=20
+            name="Ring", location=player_entity.uuid, slot="accessory", magic_bonus=5, hp_bonus=20, attack_bonus=0, defense_bonus=0
         )
         eq.equip(item_uuid=ring.uuid)
 
