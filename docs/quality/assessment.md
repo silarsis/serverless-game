@@ -36,7 +36,7 @@ The foundation is solid but there's significant work ahead. All designs are comp
 | Component | Grade | Status | Blockers |
 |-----------|-------|--------|----------|
 | **Combat Aspect** | D | Designed only | Needs implementation |
-| **Equipment System** | F | Designed only | Blocked on Combat + Crafting |
+| **Equipment System** | B+ | Implemented | gear/equip/unequip + stat bonuses; 22 passing tests |
 | **Quest System** | F | Designed only | Needs implementation |
 | **Economy/Trading** | F | Designed only | Needs Currency aspect |
 | **Magic/Spells** | F | Designed only | Blocked on Combat |

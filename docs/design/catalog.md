@@ -22,7 +22,7 @@
 | 02 | **Crafting** | [02-crafting.md](features/02-crafting.md) | 📋 Designed | 💡 Concept | Recipes, item creation |
 | 03 | **Quest Journal** | [03-quest-journal.md](features/03-quest-journal.md) | 📋 Designed | 💡 Concept | Quest tracking, objectives |
 | 04 | **Magic Spells** | [04-magic-spells.md](features/04-magic-spells.md) | 📋 Designed | 💡 Concept | Spell system, mana, effects |
-| 05 | **Equipment** | [05-equipment.md](features/05-equipment.md) | 📋 Designed | 💡 Concept | Gear, slots, stats |
+| 05 | **Equipment** | [05-equipment.md](features/05-equipment.md) | ✅ Complete | ✅ Complete | Gear, slots, stats |
 
 ## World Systems (6-10)
 
