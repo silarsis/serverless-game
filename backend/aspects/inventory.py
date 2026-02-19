@@ -248,9 +248,23 @@ class Inventory(Aspect):
         }
 
     def _carried_weight(self) -> int:
-        """Calculate total weight of items in inventory."""
+        """Calculate total weight of items in inventory.
+
+        Excludes equipped items (items in Equipment aspect's equipped dict)
+        from the weight calculation.
+        """
+        # Get equipped item UUIDs to exclude from weight
+        equipped_uuids = set()
+        try:
+            equip = self.entity.aspect("Equipment")
+            equipped_uuids = set(equip.data.get("equipped", {}).values())
+        except (ValueError, KeyError):
+            pass  # Equipment aspect not present - no exclusions
+
         total = 0
         for iuuid in self.entity.contents:
+            if iuuid in equipped_uuids:
+                continue  # Skip equipped items
             try:
                 item_entity = Entity(uuid=iuuid)
                 item_inv = item_entity.aspect("Inventory")
