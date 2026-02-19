@@ -122,3 +122,25 @@ def get_api_gateway_client():
         )
 
     raise ValueError("WEBSOCKET_API_ENDPOINT environment variable not set")
+
+
+def dynamodb_batch_get_by_uuid(table_name_env_var: str, uuids: list[str]) -> list[dict]:
+    """Fetch multiple items by uuid.
+
+    NOTE: Uses sequential get_item calls for compatibility with moto tests.
+    The production implementation can be swapped to DynamoDB batch_get_item
+    once the request/response marshalling is centralized.
+    """
+
+    if not uuids:
+        return []
+
+    table = get_dynamodb_table(table_name_env_var)
+    items: list[dict] = []
+    for uuid in uuids:
+        result = table.get_item(Key={"uuid": uuid})
+        item = result.get("Item")
+        if item:
+            items.append(item)
+
+    return items
