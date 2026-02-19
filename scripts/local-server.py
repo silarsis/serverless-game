@@ -247,7 +247,7 @@ def get_or_create_player_entity(user_id: str, name: str = "Player") -> dict:
             "uuid": entity_uuid,
             "name": name,
             "location": origin_uuid,
-            "aspects": ["Land", "Inventory", "Communication", "Suggestion"],
+            "aspects": ["Land", "Inventory", "Communication", "Suggestion", "Equipment"],
             "primary_aspect": "Land",
         }
     )

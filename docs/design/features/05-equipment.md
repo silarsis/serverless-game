@@ -408,3 +408,13 @@ Before engaging in combat, an AI agent should:
 4. **Visual descriptions.** Should equipping items change how others see you? The `get_appearance()` method is a nice addition but needs integration with `Land.look()` or a new `look_at <entity>` command.
 
 5. **Equipment persistence on death.** Should equipped items drop on death like inventory? Current design says yes (Combat._on_death drops everything). Could make "soulbound" items that persist through death.
+
+---
+
+## Implementation decision (2026-02-18)
+
+To address the spec's concern about **14 DynamoDB reads per gear check**, the implementation uses DynamoDB **batch_get_item** to load:
+- all equipped item Entity rows (ENTITY_TABLE) in one request, and
+- all equipped item Inventory rows (LOCATION_TABLE) in one request.
+
+This reduces a full gear display/bonus recompute to **2 batch reads** instead of 14 sequential get_item calls.
