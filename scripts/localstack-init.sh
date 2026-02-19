@@ -10,7 +10,7 @@ export AWS_DEFAULT_REGION=ap-southeast-1
 export AWS_PAGER=""
 
 # Use LocalStack endpoint
-LOCALSTACK_ENDPOINT="http://localhost:4566"
+LOCALSTACK_ENDPOINT="${LOCALSTACK_ENDPOINT:-http://localhost:4566}"
 
 echo "Initializing LocalStack resources for serverless-game..."
 

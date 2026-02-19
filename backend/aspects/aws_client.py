@@ -48,36 +48,6 @@ def get_dynamodb_table(table_name_env_var: str):
     return get_dynamodb_resource().Table(table_name)
 
 
-def dynamodb_batch_get_by_uuid(table_name_env_var: str, uuids: list[str]) -> list[dict]:
-    """Batch-get items from a DynamoDB table by UUID primary key.
-
-    Uses DynamoDB batch_get_item under the hood and retries UnprocessedKeys.
-
-    Args:
-        table_name_env_var: Env var name containing the DynamoDB table name
-        uuids: List of UUID strings to fetch
-
-    Returns:
-        List of DynamoDB item dicts (missing UUIDs are omitted).
-    """
-    if not uuids:
-        return []
-
-    table = get_dynamodb_table(table_name_env_var)
-    client = table.meta.client
-    table_name = table.name
-
-    request_items: dict = {table_name: {"Keys": [{uuid: {S: u}} for u in uuids]}}
-    items: list[dict] = []
-
-    while request_items:
-        resp = client.batch_get_item(RequestItems=request_items)
-        items.extend(resp.get("Responses", {}).get(table_name, []))
-        request_items = resp.get("UnprocessedKeys", {})
-
-    return items
-
-
 def get_sns_resource():
     """Get SNS resource configured for current environment."""
     endpoint = get_localstack_endpoint()
