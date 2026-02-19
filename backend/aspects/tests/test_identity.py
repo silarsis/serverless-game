@@ -296,6 +296,7 @@ class TestIdentity(unittest.TestCase):
 
     def test_inspect_target_with_identity(self):
         from aspects.thing import Entity
+
         """Test inspecting entity with full Identity."""
         from aspects.identity import Identity
 
@@ -333,7 +334,9 @@ class TestIdentity(unittest.TestCase):
     def test_on_equipment_change_callable(self):
         """Test the on_equipment_change callable."""
         _, identity = self._make_player()
-        result = identity.on_equipment_change("Wielding a sword.", [{"slot": "hand", "name": "sword"}])
+        result = identity.on_equipment_change(
+            "Wielding a sword.", [{"slot": "hand", "name": "sword"}]
+        )
         self.assertEqual(result["status"], "updated")
         self.assertEqual(identity.data["equipment_summary"], "Wielding a sword.")
 
