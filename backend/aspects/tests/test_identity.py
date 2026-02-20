@@ -308,8 +308,8 @@ class TestIdentity(unittest.TestCase):
 
     def test_inspect_target_with_identity(self):
         """Test inspecting entity with full Identity."""
-        from aspects.thing import Entity
         from aspects.identity import Identity
+        from aspects.thing import Entity
 
         entity1, identity1 = self._make_player(location="room-1")
         # Create another entity with Identity
