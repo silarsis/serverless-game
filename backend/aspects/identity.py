@@ -194,7 +194,10 @@ class Identity(Aspect):
         if not re.match(r"^[a-z][a-z0-9_]{0,29}$", attribute):
             return {
                 "type": "error",
-                "message": "Attribute name must be 1-30 lowercase letters, numbers, or underscores, starting with a letter.",
+                "message": (
+                    "Attribute name must be 1-30 lowercase letters, numbers "
+                    "or underscores, starting with a letter."
+                ),
             }
 
         # Clear attribute if no value
