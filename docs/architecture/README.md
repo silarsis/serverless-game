@@ -83,6 +83,7 @@ Event Structure:
 | **REST** | HTTP API entry point | - | Implemented |
 | **Location** | Entity positioning, movement | location_table | Implemented |
 | **Land** | Land claims, terrain | land_table | Implemented |
+| **Weather** | Time periods, weather conditions | - (pure computation) | Implemented |
 | **Combat** | Fighting, damage, HP | combat_table | Designed |
 | **Crafting** | Item creation, recipes | crafting_table | Designed |
 | **Quest** | Quest tracking, journal | quest_table | Designed |
@@ -171,7 +172,7 @@ See `../quality/assessment.md` for:
 
 Per `../design/catalog.md`, planned aspects include:
 - Combat, Crafting, Quest, Magic, Equipment
-- Weather, Factions, Building, Dialogue
+- Weather ✓, Factions, Building, Dialogue
 - Dungeons, Stealth, Trading, Exploration
 - Companions, Knowledge, Party, Projects
 - Social Graph, Messaging, Identity
