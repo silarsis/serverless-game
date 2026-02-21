@@ -231,6 +231,23 @@ functions:
             aspect:
               - Inventory
 
+  identity:
+    handler: aspects/identity.handler
+    VpcId:
+      Ref:
+        Fn::ImportValue: VpcId
+    package:
+      exclude:
+        - ./**
+      include:
+        - aspects/**
+    events:
+      - sns:
+          arn: "arn:aws:sns:#{AWS::Region}:#{AWS::AccountId}:${self:custom.topics.thingName}"
+          filterPolicy:
+            aspect:
+              - Identity
+
   npc:
     handler: aspects/npc.handler
     VpcId:
