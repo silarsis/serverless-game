@@ -1,7 +1,9 @@
-"""Tests for the Identity aspect (name, describe, appearance, inspect, profile, title).
+"""Tests for the Identity aspect.
 
-Identity is an Aspect subclass. Tests create Entity records and wire them to Identity
-aspects via the entity back-reference.
+Covers: name, describe, appearance, inspect, profile, title.
+
+Identity is an Aspect subclass. Tests create Entity records and wire them to
+Identity aspects via the entity back-reference.
 """
 
 import os
@@ -21,7 +23,10 @@ class TestIdentity(unittest.TestCase):
         os.environ["ENTITY_TABLE"] = "test-entity"
         os.environ["LOCATION_TABLE"] = "test-location"
 
-        self.dynamodb = boto3.resource("dynamodb", region_name="ap-southeast-1")
+        self.dynamodb = boto3.resource(
+            "dynamodb",
+            region_name="ap-southeast-1",
+        )
 
         # Entity table with contents GSI
         self.dynamodb.create_table(
@@ -45,7 +50,10 @@ class TestIdentity(unittest.TestCase):
                     },
                 }
             ],
-            ProvisionedThroughput={"ReadCapacityUnits": 5, "WriteCapacityUnits": 5},
+            ProvisionedThroughput={
+                "ReadCapacityUnits": 5,
+                "WriteCapacityUnits": 5,
+            },
         )
 
         # Location/Identity aspect table
@@ -55,7 +63,10 @@ class TestIdentity(unittest.TestCase):
             AttributeDefinitions=[
                 {"AttributeName": "uuid", "AttributeType": "S"},
             ],
-            ProvisionedThroughput={"ReadCapacityUnits": 5, "WriteCapacityUnits": 5},
+            ProvisionedThroughput={
+                "ReadCapacityUnits": 5,
+                "WriteCapacityUnits": 5,
+            },
         )
 
     def _make_player(self, name="TestPlayer", location="room-1"):
@@ -146,7 +157,7 @@ class TestIdentity(unittest.TestCase):
         """Test that description over 1000 chars is truncated."""
         _, identity = self._make_player()
         long_desc = "x" * 1500
-        result = identity.describe(long_desc)
+        _ = identity.describe(long_desc)
         self.assertEqual(len(identity.data["description"]), 1000)
 
     def test_appearance_list_empty(self):
@@ -191,12 +202,13 @@ class TestIdentity(unittest.TestCase):
         _, identity = self._make_player()
         result = identity.shortdesc("A weathered wanderer.")
         self.assertEqual(result["type"], "shortdesc_updated")
-        self.assertEqual(identity.data["short_description"], "A weathered wanderer.")
+        expected = "A weathered wanderer."
+        self.assertEqual(identity.data["short_description"], expected)
 
     def test_shortdesc_truncated(self):
         """Test short description truncation."""
         _, identity = self._make_player()
-        result = identity.shortdesc("x" * 150)
+        _ = identity.shortdesc("x" * 150)
         self.assertEqual(len(identity.data["short_description"]), 100)
 
     def test_title_set(self):
@@ -221,7 +233,7 @@ class TestIdentity(unittest.TestCase):
         """Test title truncation."""
         _, identity = self._make_player()
         identity.name("Test")
-        result = identity.title("x" * 60)
+        _ = identity.title("x" * 60)
         self.assertEqual(len(identity.data["title"]), 50)
 
     def test_profile_self(self):
@@ -247,7 +259,7 @@ class TestIdentity(unittest.TestCase):
         entity._save()
         # Load fresh
         identity2 = entity.aspect("Identity")
-        result = identity2.profile()
+        _ = identity2.profile()
         # Should have corrected entity name
         self.assertEqual(entity.name, "FixedName")
 
@@ -295,10 +307,9 @@ class TestIdentity(unittest.TestCase):
         self.assertEqual(result["name"], "OtherPlayer")
 
     def test_inspect_target_with_identity(self):
-        from aspects.thing import Entity
-
         """Test inspecting entity with full Identity."""
         from aspects.identity import Identity
+        from aspects.thing import Entity
 
         entity1, identity1 = self._make_player(location="room-1")
         # Create another entity with Identity
@@ -338,7 +349,8 @@ class TestIdentity(unittest.TestCase):
             "Wielding a sword.", [{"slot": "hand", "name": "sword"}]
         )
         self.assertEqual(result["status"], "updated")
-        self.assertEqual(identity.data["equipment_summary"], "Wielding a sword.")
+        expected = "Wielding a sword."
+        self.assertEqual(identity.data["equipment_summary"], expected)
 
 
 if __name__ == "__main__":
