@@ -21,8 +21,8 @@ from .aws_client import get_dynamodb_table
 from .decorators import player_command
 from .handler import lambdaHandler
 from .location import ExitsType, Location
-from .weather import add_weather_to_description
 from .thing import Entity, IdType, callable
+from .weather import add_weather_to_description
 
 logger = logging.getLogger(__name__)
 

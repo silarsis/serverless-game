@@ -7,16 +7,15 @@ Tests the noise-based weather computation system:
 - Determinism (same input = same output)
 """
 
-
 from backend.aspects.weather import (
+    TIME_PERIODS,
+    WEATHER_OPTIONS,
+    _get_location_seed,
+    _noise,
+    add_weather_to_description,
+    get_time_description,
     get_time_period,
     get_weather_at,
-    get_time_description,
-    add_weather_to_description,
-    _noise,
-    _get_location_seed,
-    WEATHER_OPTIONS,
-    TIME_PERIODS,
 )
 
 
@@ -146,8 +145,17 @@ class TestAddWeatherToDescription:
         # (the exact word depends on the noise function output)
         words = result.lower().split()
         atmospheric_words = {
-            "rain", "clear", "fog", "storm", "snow", "sky",
-            "sunlight", "darkness", "dawn", "dusk", "light"
+            "rain",
+            "clear",
+            "fog",
+            "storm",
+            "snow",
+            "sky",
+            "sunlight",
+            "darkness",
+            "dawn",
+            "dusk",
+            "light",
         }
         has_atmosphere = any(w in atmospheric_words for w in words)
         assert has_atmosphere
