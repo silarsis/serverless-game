@@ -232,7 +232,7 @@ def get_or_create_player_entity(user_id: str, name: str = "Player") -> dict:
     try:
         entity = Entity(uuid=entity_uuid)
         logger.info(f"Found existing player entity {entity_uuid}")
-        
+
         # Ensure Identity aspect is present for Feature 21
         aspects = entity.data.get("aspects", [])
         if "Identity" not in aspects:
@@ -307,9 +307,7 @@ async def handle_login(request):
         entity_info = get_or_create_player_entity(user_id, user_name)
         result["entity"] = entity_info
 
-    return web.json_response(
-        result, status=status, headers={"Access-Control-Allow-Origin": "*"}
-    )
+    return web.json_response(result, status=status, headers={"Access-Control-Allow-Origin": "*"})
 
 
 async def handle_generate_key(request):
@@ -344,9 +342,7 @@ async def handle_list_keys(request):
     from aspects.auth import list_api_keys
 
     keys = list_api_keys(claims["sub"])
-    return web.json_response(
-        {"keys": keys}, headers={"Access-Control-Allow-Origin": "*"}
-    )
+    return web.json_response({"keys": keys}, headers={"Access-Control-Allow-Origin": "*"})
 
 
 async def handle_delete_key(request):
@@ -364,9 +360,7 @@ async def handle_delete_key(request):
 
     result = delete_api_key(claims["sub"], api_key)
     status = 200 if result.get("success") else 403
-    return web.json_response(
-        result, status=status, headers={"Access-Control-Allow-Origin": "*"}
-    )
+    return web.json_response(result, status=status, headers={"Access-Control-Allow-Origin": "*"})
 
 
 async def handle_cors_preflight(request):
@@ -430,14 +424,10 @@ async def handle_websocket(request):
                     cmd_data = data.get("data", {})
 
                     if not command:
-                        await ws.send_json(
-                            {"type": "error", "message": "Missing command"}
-                        )
+                        await ws.send_json({"type": "error", "message": "Missing command"})
                         continue
 
-                    await _handle_ws_command(
-                        ws, connection_id, command, cmd_data, claims
-                    )
+                    await _handle_ws_command(ws, connection_id, command, cmd_data, claims)
 
                 except json.JSONDecodeError:
                     await ws.send_json({"type": "error", "message": "Invalid JSON"})
@@ -478,9 +468,7 @@ async def _handle_ws_command(ws, connection_id, command, data, claims):
         try:
             entity = Entity(uuid=entity_uuid)
         except (KeyError, Exception):
-            logger.warning(
-                f"Entity {entity_uuid} not found, creating new player entity"
-            )
+            logger.warning(f"Entity {entity_uuid} not found, creating new player entity")
             user_id = claims.get("sub", DEV_USER_UID)
             user_name = claims.get("bot_name") or claims.get("name") or "Player"
             entity_info = get_or_create_player_entity(user_id, user_name)
@@ -566,9 +554,7 @@ def _detach_connection(connection_id: str):
                 Key={"uuid": item["uuid"]},
                 UpdateExpression="REMOVE connection_id",
             )
-            logger.info(
-                f"Detached connection {connection_id} from entity {item['uuid']}"
-            )
+            logger.info(f"Detached connection {connection_id} from entity {item['uuid']}")
     except Exception as e:
         logger.error(f"Error detaching connection from entity table: {e}")
 
@@ -677,9 +663,12 @@ def _generate_origin(origin):
 
         # Apply exits (resolve coords → UUIDs, bidirectional)
         opposite = {
-            "north": "south", "south": "north",
-            "east": "west", "west": "east",
-            "up": "down", "down": "up",
+            "north": "south",
+            "south": "north",
+            "east": "west",
+            "west": "east",
+            "up": "down",
+            "down": "up",
         }
         for direction, dest_coords in blueprint.exits.items():
             if direction in origin.exits:
@@ -720,8 +709,10 @@ def _generate_origin(origin):
         )
         # Ensure at least 4 cardinal exits
         opposite = {
-            "north": "south", "south": "north",
-            "east": "west", "west": "east",
+            "north": "south",
+            "south": "north",
+            "east": "west",
+            "west": "east",
         }
         for direction in ["north", "south", "east", "west"]:
             if direction not in origin.exits:

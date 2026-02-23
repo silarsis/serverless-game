@@ -175,7 +175,10 @@ class Identity(Aspect):
                 return {
                     "type": "appearance",
                     "attributes": {},
-                    "message": "You have no physical attributes set. Use: appearance <attribute> <value>",
+                    "message": (
+                        "You have no physical attributes set. Use: appearance <attribute> "
+                        "<value>"
+                    ),
                 }
 
             lines = ["=== Your Appearance ==="]
@@ -224,7 +227,10 @@ class Identity(Aspect):
         if attribute not in attributes and len(attributes) >= MAX_ATTRIBUTES:
             return {
                 "type": "error",
-                "message": f"You have reached the maximum of {MAX_ATTRIBUTES} attributes. Remove one first.",
+                "message": (
+                    f"You have reached the maximum of {MAX_ATTRIBUTES} attributes. "
+                    "Remove one first."
+                ),
             }
 
         # Set the attribute

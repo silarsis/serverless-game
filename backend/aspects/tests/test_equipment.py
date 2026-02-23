@@ -57,7 +57,9 @@ class TestEquipment(unittest.TestCase):
         equip.entity = entity
         return equip, entity
 
-    def _make_equippable_item(self, name, slot, attack_bonus=0, defense_bonus=0, magic_bonus=0, location="room-1"):
+    def _make_equippable_item(
+        self, name, slot, attack_bonus=0, defense_bonus=0, magic_bonus=0, location="room-1"
+    ):
         """Create Entity + Inventory aspect for an equippable item."""
         from aspects.inventory import Inventory
         from aspects.thing import Entity

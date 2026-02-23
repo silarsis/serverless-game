@@ -58,6 +58,7 @@ class Equipment(Aspect):
             self.data["stat_bonuses_computed_at"] = int(time.time())
             return totals
 
+        _ = dynamodb_batch_get_by_uuid("ENTITY_TABLE", uuids)
         entity_items = {i.get("uuid"): i for i in dynamodb_batch_get_by_uuid("ENTITY_TABLE", uuids)}
         inv_items = {i.get("uuid"): i for i in dynamodb_batch_get_by_uuid("LOCATION_TABLE", uuids)}
 
