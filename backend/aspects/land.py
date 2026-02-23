@@ -22,6 +22,7 @@ from .decorators import player_command
 from .handler import lambdaHandler
 from .location import ExitsType, Location
 from .thing import Entity, IdType, callable
+from .weather import add_weather_to_description
 
 logger = logging.getLogger(__name__)
 
@@ -354,6 +355,11 @@ class Land(Location):
             room_entity_contents = room_entity.contents
         except (KeyError, Exception):
             pass
+
+        # Add time and weather overlay
+        coords = room.coordinates
+        biome = room.data.get("biome", "unknown")
+        desc = add_weather_to_description(desc, coords[0], coords[1], biome)
 
         return {
             "type": "look",

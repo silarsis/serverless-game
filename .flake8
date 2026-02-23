@@ -7,7 +7,9 @@ exclude =
     .venv,
     venv,
     build,
-    dist
+    dist,
+    .github,
+    scripts
 per-file-ignores =
     __init__.py:D104
     *test*.py:F841
