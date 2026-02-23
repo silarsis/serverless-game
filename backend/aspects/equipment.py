@@ -59,7 +59,7 @@ class Equipment(Aspect):
             return totals
 
         _ = dynamodb_batch_get_by_uuid("ENTITY_TABLE", uuids)
-        entity_items = {i.get("uuid"): i for i in dynamodb_batch_get_by_uuid("ENTITY_TABLE", uuids)}
+        _ = {i.get("uuid"): i for i in dynamodb_batch_get_by_uuid("ENTITY_TABLE", uuids)}
         inv_items = {i.get("uuid"): i for i in dynamodb_batch_get_by_uuid("LOCATION_TABLE", uuids)}
 
         for item_uuid in uuids:
