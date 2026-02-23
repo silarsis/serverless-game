@@ -145,8 +145,10 @@ class TestAddWeatherToDescription:
         # Should contain weather-related words
         # (the exact word depends on the noise function output)
         words = result.lower().split()
-        atmospheric_words = {"rain", "clear", "fog", "storm", "snow", "sky",
-                         "sunlight", "darkness", "dawn", "dusk", "light"}
+        atmospheric_words = {
+            "rain", "clear", "fog", "storm", "snow", "sky",
+            "sunlight", "darkness", "dawn", "dusk", "light"
+        }
         has_atmosphere = any(w in atmospheric_words for w in words)
         assert has_atmosphere
 
